@@ -9,7 +9,12 @@ import {
   getMessages,
   getMessageCount,
   saveMessageBody,
-  getMessageBody
+  getMessageBody,
+  removeMessages,
+  getSyncState,
+  upsertSyncState,
+  upsertAttachmentMeta,
+  updateMessageSnippet
 } from '../store/db.js'
 
 const IMAP_HOST = 'imap.mail.me.com'
@@ -62,6 +67,15 @@ function extractSnippet(text, html) {
   return ''
 }
 
+function computeThreadId(messageId, inReplyTo, references) {
+  if (references) {
+    const ids = references.trim().split(/\s+/).filter(Boolean)
+    if (ids.length > 0) return ids[0]
+  }
+  if (inReplyTo) return inReplyTo.trim()
+  return messageId || null
+}
+
 export class ImapClient extends EventEmitter {
   constructor(email, password) {
     super()
@@ -74,6 +88,7 @@ export class ImapClient extends EventEmitter {
     this.reconnectDelay = 5000
     this.idleFolder = 'INBOX'
     this.syncTimer = null
+    this._idleLock = null
   }
 
   // ── Connection ────────────────────────────────────────────────────────────
@@ -102,9 +117,11 @@ export class ImapClient extends EventEmitter {
     clearTimeout(this.reconnectTimer)
     clearInterval(this.syncTimer)
 
+    try { this._idleLock?.release() } catch { /* ignore */ }
     try { await this.idleClient?.logout() } catch { /* ignore */ }
     try { await this.client?.logout() } catch { /* ignore */ }
 
+    this._idleLock = null
     this.idleClient = null
     this.client = null
     this.emit('connection-status', 'disconnected')
@@ -132,81 +149,73 @@ export class ImapClient extends EventEmitter {
       this.idleClient = makeClient(this.email, this.password)
       await this.idleClient.connect()
 
-      const lock = await this.idleClient.getMailboxLock('INBOX')
-      try {
-        this.idleClient.on('exists', async (data) => {
-          const { count, prevCount } = data
-          if (count > prevCount) {
-            await this._fetchNewMessages('INBOX', prevCount + 1, count)
-          }
-        })
+      this.idleClient.on('exists', async (data) => {
+        const { count, prevCount } = data
+        if (count > prevCount) {
+          await this._fetchNewMessages(this.idleFolder, prevCount, count).catch(console.error)
+        }
+      })
 
-        this.idleClient.on('flags', async () => {
-          await this._syncFolderCounts('INBOX')
-        })
+      this.idleClient.on('flags', async () => {
+        await this._syncFolderCounts(this.idleFolder).catch(console.error)
+      })
 
-        // IDLE loop — imapflow handles the DONE/re-IDLE cycle internally
-        // We keep the lock open and await idle; it resolves when a change arrives
-        const keepIdling = async () => {
-          while (this.connected) {
-            try {
-              await this.idleClient.idle()
-            } catch (err) {
-              if (!this.connected) break
-              console.error('IDLE error:', err.message)
-              await new Promise(r => setTimeout(r, 5000))
-            }
+      this.idleClient.on('error', (err) => {
+        if (this.connected) console.error('IDLE client error:', err.message)
+      })
+
+      const lock = await this.idleClient.getMailboxLock(this.idleFolder)
+      this._idleLock = lock
+
+      const keepIdling = async () => {
+        while (this.connected) {
+          try {
+            await this.idleClient.idle()
+          } catch (err) {
+            if (!this.connected) break
+            console.error('IDLE loop error:', err.message)
+            await new Promise(r => setTimeout(r, 5000))
           }
         }
-        keepIdling().catch(console.error)
-      } finally {
-        // Lock released when IDLE loop exits
+        lock.release()
+        this._idleLock = null
       }
+      keepIdling().catch(console.error)
     } catch (err) {
       console.error('Failed to start IDLE:', err.message)
-      // Fall back to polling every 2 minutes
       this.syncTimer = setInterval(() => this.syncInbox(), 120000)
     }
   }
 
-  async _fetchNewMessages(folder, seqFrom, seqTo) {
+  async _fetchNewMessages(folder, prevCount, newCount) {
     if (!this.client) return
     const lock = await this.client.getMailboxLock(folder)
     try {
-      const range = `${seqFrom}:${seqTo}`
-      for await (const msg of this.client.fetch(range, {
-        envelope: true,
-        flags: true,
-        bodyStructure: true,
-        size: true
-      })) {
-        const envelope = msg.envelope
-        const parsed = {
-          uid: msg.uid,
-          folder,
-          message_id: envelope.messageId || '',
-          subject: envelope.subject || '(No subject)',
-          from_name: envelope.from?.[0]?.name || envelope.from?.[0]?.address || '',
-          from_email: envelope.from?.[0]?.address || '',
-          to_addresses: parseAddressList(envelope.to),
-          cc_addresses: parseAddressList(envelope.cc),
-          date: envelope.date ? new Date(envelope.date).getTime() : Date.now(),
-          flags: [...(msg.flags || [])],
-          snippet: '',
-          has_attachments: this._hasAttachments(msg.bodyStructure),
-          size: msg.size || 0
-        }
-        upsertMessage(parsed)
+      const syncState = getSyncState(this.email, folder)
+      const lastUid   = syncState?.last_uid || 0
+      const uids      = lastUid > 0
+        ? await this.client.search({ uid: `${lastUid + 1}:*` }, { uid: true })
+        : []
+
+      if (!uids?.length) return
+
+      let maxUid = lastUid
+      for await (const msg of this.client.fetch(uids, {
+        envelope: true, flags: true, bodyStructure: true, size: true
+      }, { uid: true })) {
+        this._persistEnvelope(msg, folder)
+        if (msg.uid > maxUid) maxUid = msg.uid
 
         if (!msg.flags?.has('\\Seen')) {
           this.emit('new-mail', {
-            subject: parsed.subject,
-            from: parsed.from_name || parsed.from_email,
+            subject: msg.envelope.subject || '(No subject)',
+            from:    msg.envelope.from?.[0]?.name || msg.envelope.from?.[0]?.address || '',
             folder,
-            uid: parsed.uid
+            uid:     msg.uid
           })
         }
       }
+      if (maxUid > lastUid) upsertSyncState(this.email, folder, maxUid, newCount)
     } finally {
       lock.release()
     }
@@ -282,40 +291,108 @@ export class ImapClient extends EventEmitter {
     const lock = await this.client.getMailboxLock(folder)
     try {
       const status = await this.client.status(folder, { messages: true, unseen: true })
-      const total = status.messages || 0
-      const unseen = status.unseen || 0
+      const total  = status.messages || 0
+      const unseen = status.unseen  || 0
       updateFolderCounts(folder, unseen, total)
 
-      if (total === 0) return
-
-      // Fetch latest 200 message envelopes for initial cache
-      const from = Math.max(1, total - 199)
-      const range = `${from}:*`
-      for await (const msg of this.client.fetch(range, {
-        envelope: true,
-        flags: true,
-        bodyStructure: true,
-        size: true
-      })) {
-        const envelope = msg.envelope
-        upsertMessage({
-          uid: msg.uid,
-          folder,
-          message_id: envelope.messageId || '',
-          subject: envelope.subject || '(No subject)',
-          from_name: envelope.from?.[0]?.name || envelope.from?.[0]?.address || '',
-          from_email: envelope.from?.[0]?.address || '',
-          to_addresses: parseAddressList(envelope.to),
-          cc_addresses: parseAddressList(envelope.cc),
-          date: envelope.date ? new Date(envelope.date).getTime() : Date.now(),
-          flags: [...(msg.flags || [])],
-          snippet: '',
-          has_attachments: this._hasAttachments(msg.bodyStructure),
-          size: msg.size || 0
-        })
+      if (total === 0) {
+        this.emit('sync-complete', { folder, newCount: 0 })
+        return
       }
+
+      const syncState = getSyncState(this.email, folder)
+      const lastUid   = syncState?.last_uid || 0
+      let   newCount  = 0
+      let   maxUid    = lastUid
+
+      if (lastUid === 0) {
+        // Cold start: fetch envelopes of most recent 200 messages
+        const from  = Math.max(1, total - 199)
+        const range = `${from}:*`
+        for await (const msg of this.client.fetch(range, {
+          envelope: true, flags: true, bodyStructure: true, size: true
+        }, { uid: true })) {
+          this._persistEnvelope(msg, folder)
+          if (msg.uid > maxUid) maxUid = msg.uid
+          newCount++
+        }
+      } else {
+        // Delta sync: only UIDs we haven't seen
+        const uids = await this.client.search({ uid: `${lastUid + 1}:*` }, { uid: true })
+        if (uids?.length) {
+          for await (const msg of this.client.fetch(uids, {
+            envelope: true, flags: true, bodyStructure: true, size: true
+          }, { uid: true })) {
+            this._persistEnvelope(msg, folder)
+            if (msg.uid > maxUid) maxUid = msg.uid
+            newCount++
+          }
+        }
+      }
+
+      if (maxUid > 0) upsertSyncState(this.email, folder, maxUid, total)
+      this.emit('sync-complete', { folder, newCount })
     } finally {
       lock.release()
+    }
+  }
+
+  _persistEnvelope(msg, folder) {
+    const envelope   = msg.envelope
+    const inReplyTo  = envelope.inReplyTo  || null
+    const references = envelope.references || null
+    const messageId  = envelope.messageId  || null
+    const threadId   = computeThreadId(messageId, inReplyTo, references)
+
+    upsertMessage({
+      uid:           msg.uid,
+      folder,
+      account_email: this.email,
+      message_id:    messageId,
+      subject:       envelope.subject || '(No subject)',
+      from_name:     envelope.from?.[0]?.name || envelope.from?.[0]?.address || '',
+      from_email:    envelope.from?.[0]?.address || '',
+      to_addresses:  parseAddressList(envelope.to),
+      cc_addresses:  parseAddressList(envelope.cc),
+      date:          envelope.date ? new Date(envelope.date).getTime() : Date.now(),
+      flags:         [...(msg.flags || [])],
+      snippet:       '',
+      has_attachments: this._hasAttachments(msg.bodyStructure),
+      size:          msg.size || 0,
+      thread_id:     threadId,
+      in_reply_to:   inReplyTo,
+      message_refs:  references
+    })
+
+    this._persistAttachmentMeta(msg, folder, messageId)
+  }
+
+  _persistAttachmentMeta(msg, folder, messageId) {
+    if (!msg.bodyStructure) return
+    this._walkBodyStructure(msg.bodyStructure, folder, msg.uid, messageId, '')
+  }
+
+  _walkBodyStructure(node, folder, uid, messageId, partId) {
+    if (!node) return
+    const isAttachment = node.disposition === 'attachment' ||
+      (node.disposition === 'inline' && node.type !== 'text')
+    if (isAttachment && node.type !== 'multipart') {
+      upsertAttachmentMeta({
+        uid,
+        folder,
+        message_id:   messageId,
+        part_id:      partId || '1',
+        filename:     node.dispositionParameters?.filename || node.parameters?.name || 'attachment',
+        content_type: `${node.type}/${node.subtype}`.toLowerCase(),
+        size:         node.size || 0,
+        content_id:   node.id || null,
+        is_inline:    node.disposition === 'inline' ? 1 : 0
+      })
+    }
+    if (node.childNodes) {
+      node.childNodes.forEach((child, i) => {
+        this._walkBodyStructure(child, folder, uid, messageId, partId ? `${partId}.${i + 1}` : `${i + 1}`)
+      })
     }
   }
 
@@ -371,16 +448,41 @@ export class ImapClient extends EventEmitter {
 
     if (!parsed) return { html: null, text: null, attachments: [] }
 
-    const html = parsed.html || null
-    const text = parsed.text || null
-    const attachments = (parsed.attachments || []).map(a => ({
-      filename: a.filename || 'attachment',
-      size: a.size || 0,
-      type: a.contentType || 'application/octet-stream'
-    }))
+    const html    = parsed.html || null
+    const text    = parsed.text || null
+    const snippet = extractSnippet(text, html)
 
     saveMessageBody(folder, uid, html, text)
+    if (snippet) updateMessageSnippet(folder, uid, snippet)
+
+    const attachments = (parsed.attachments || []).map(a => ({
+      filename: a.filename || 'attachment',
+      size:     a.size || 0,
+      type:     a.contentType || 'application/octet-stream',
+      partId:   a.partId || null
+    }))
+
     return { html, text, attachments }
+  }
+
+  async downloadAttachment(folder, uid, partId, destPath) {
+    if (!this.client) throw new Error('Not connected')
+    const { createWriteStream } = await import('fs')
+    const lock = await this.client.getMailboxLock(folder)
+    try {
+      const stream = await this.client.download(`${uid}`, partId, { uid: true })
+      if (!stream?.content) throw new Error('No content stream returned')
+      await new Promise((resolve, reject) => {
+        const ws = createWriteStream(destPath)
+        stream.content.on('error', reject)
+        ws.on('error', reject)
+        ws.on('finish', resolve)
+        stream.content.pipe(ws)
+      })
+      return { downloaded: true, filePath: destPath }
+    } finally {
+      lock.release()
+    }
   }
 
   _hasAttachments(structure) {
@@ -399,9 +501,9 @@ export class ImapClient extends EventEmitter {
     const lock = await this.client.getMailboxLock(folder)
     try {
       if (add) {
-        await this.client.messageFlagsAdd({ uid }, [flag], { uid: true })
+        await this.client.messageFlagsAdd([uid], [flag], { uid: true })
       } else {
-        await this.client.messageFlagsRemove({ uid }, [flag], { uid: true })
+        await this.client.messageFlagsRemove([uid], [flag], { uid: true })
       }
     } finally {
       lock.release()
@@ -415,6 +517,7 @@ export class ImapClient extends EventEmitter {
     const lock = await this.client.getMailboxLock(folder)
     try {
       await this.client.messageMove([uid], destination, { uid: true })
+      removeMessages([uid], folder)
     } finally {
       lock.release()
     }
@@ -431,6 +534,7 @@ export class ImapClient extends EventEmitter {
       try {
         await this.client.messageFlagsAdd([uid], ['\\Deleted'], { uid: true })
         await this.client.messageDelete([uid], { uid: true })
+        removeMessages([uid], folder)
       } finally {
         lock.release()
       }
@@ -546,6 +650,7 @@ export class ImapClient extends EventEmitter {
       } else {
         await this.client.messageMove(uids, trashFolder, { uid: true })
       }
+      removeMessages(uids, folder)
     } finally {
       lock.release()
     }
@@ -556,6 +661,7 @@ export class ImapClient extends EventEmitter {
     const lock = await this.client.getMailboxLock(folder)
     try {
       await this.client.messageMove(uids, destination, { uid: true })
+      removeMessages(uids, folder)
     } finally {
       lock.release()
     }
