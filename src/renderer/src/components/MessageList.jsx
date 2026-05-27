@@ -344,8 +344,19 @@ export default function MessageList() {
         </div>
       ) : displayMessages.length === 0 ? (
         <div className="message-list__empty">
-          <IconEnvelope size={40} style={{ opacity: 0.25, color: 'var(--text-tertiary)' }} />
-          <span>{localSearch ? t('messages.noResults') : t('messages.noMessages')}</span>
+          <div style={{ fontSize: 40, opacity: 0.2 }}>📭</div>
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 'var(--weight-medium)' }}>
+            {localSearch ? t('messages.noResults') : t('messages.noMessages')}
+          </span>
+          {localSearch && (
+            <button
+              className="btn btn--ghost"
+              onClick={clearSearch}
+              style={{ marginTop: 'var(--sp-2)' }}
+            >
+              {t('action.clearSearch')}
+            </button>
+          )}
         </div>
       ) : (
         <div className="message-list__body" ref={listRef} onScroll={handleScroll} role="list" aria-label="Messages">

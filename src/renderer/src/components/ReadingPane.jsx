@@ -134,11 +134,18 @@ export default function ReadingPane() {
     return (
       <div className="reading-pane">
         <div className="reading-pane__empty">
-          <span className="reading-pane__empty-icon" style={{ fontSize: 40 }}><IconEnvelope size={48} style={{ opacity: 0.3 }} /></span>
+          <div style={{ fontSize: 48, marginBottom: 'var(--sp-3)', opacity: 0.2 }}>✉️</div>
           <span className="reading-pane__empty-text">{t('reading.noMessage')}</span>
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', textAlign: 'center', maxWidth: 200 }}>
             {t('reading.noMessageDesc')}
           </span>
+          <button
+            className="btn btn--ghost"
+            style={{ marginTop: 'var(--sp-4)' }}
+            onClick={() => dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new' } })}
+          >
+            {t('action.compose')}
+          </button>
         </div>
       </div>
     )
