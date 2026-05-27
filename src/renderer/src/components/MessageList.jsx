@@ -314,6 +314,16 @@ export default function MessageList() {
               onClick={e => handleItemClick(e, msg)}
               onDoubleClick={() => window.api.window.openMessage(msg)}
               onContextMenu={e => handleItemContextMenu(e, msg)}
+              onDragStart={e => {
+                const isInSelection = selectedKeys.has(msgKey(msg)) && selectedKeys.size > 1
+                const toMove = isInSelection
+                  ? displayMessages.filter(m => selectedKeys.has(msgKey(m)))
+                  : [msg]
+                e.dataTransfer.setData('x-mail-messages', JSON.stringify(
+                  toMove.map(m => ({ uid: m.uid, folder: m.folder }))
+                ))
+                e.dataTransfer.effectAllowed = 'move'
+              }}
             />
           ))}
 
@@ -345,7 +355,7 @@ export default function MessageList() {
   )
 }
 
-function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick, onContextMenu }) {
+function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick, onContextMenu, onDragStart }) {
   const isUnread  = !message.flags?.includes('\\Seen')
   const isStarred = message.flags?.includes('\\Flagged')
   const initials  = getInitials(message.from_name, message.from_email)
@@ -354,6 +364,8 @@ function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick,
   return (
     <div
       className={`message-item${selected ? ' selected' : ''}${isUnread ? ' unread' : ''}${multiSelected ? ' multi-selected' : ''}`}
+      draggable
+      onDragStart={onDragStart}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}

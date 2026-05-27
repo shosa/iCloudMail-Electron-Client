@@ -414,7 +414,7 @@ export class ImapClient extends EventEmitter {
     if (!this.client) throw new Error('Not connected')
     const lock = await this.client.getMailboxLock(folder)
     try {
-      await this.client.messageMove({ uid }, destination, { uid: true })
+      await this.client.messageMove([uid], destination, { uid: true })
     } finally {
       lock.release()
     }
@@ -429,8 +429,8 @@ export class ImapClient extends EventEmitter {
     if (permanent || folder === trashFolder) {
       const lock = await this.client.getMailboxLock(folder)
       try {
-        await this.client.messageFlagsAdd({ uid }, ['\\Deleted'], { uid: true })
-        await this.client.messageDelete({ uid }, { uid: true })
+        await this.client.messageFlagsAdd([uid], ['\\Deleted'], { uid: true })
+        await this.client.messageDelete([uid], { uid: true })
       } finally {
         lock.release()
       }

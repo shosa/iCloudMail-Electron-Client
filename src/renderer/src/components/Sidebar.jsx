@@ -145,6 +145,7 @@ export default function Sidebar() {
   const [folderMenu, setFolderMenu] = useState(null)
   const [avatarMenu, setAvatarMenu] = useState(false)
   const avatarRef = useRef(null)
+  const [dragOverPath, setDragOverPath] = useState(null)
 
   const tRef = useRef(t)
   useEffect(() => { tRef.current = t }, [t])
@@ -213,6 +214,24 @@ export default function Sidebar() {
     }
   }
 
+  function handleFolderDrop(targetFolder, e) {
+    e.preventDefault()
+    setDragOverPath(null)
+    const raw = e.dataTransfer.getData('x-mail-messages')
+    if (!raw) return
+    let messages
+    try { messages = JSON.parse(raw) } catch { return }
+    const byFolder = {}
+    messages.forEach(m => {
+      if (m.folder === targetFolder.path) return
+      ;(byFolder[m.folder] = byFolder[m.folder] || []).push(m.uid)
+    })
+    Object.entries(byFolder).forEach(([srcFolder, uids]) => {
+      uids.forEach(uid => dispatch({ type: 'REMOVE_MESSAGE', payload: { uid, folder: srcFolder } }))
+      window.api.imap.bulkMove(srcFolder, uids, targetFolder.path)
+    })
+  }
+
   const sorted = [...state.folders.list].sort((a, b) => folderSortKey(a) - folderSortKey(b))
   const systemFolders = sorted.filter(f => f.special_use)
   const customFolders = sorted.filter(f => !f.special_use)
@@ -235,8 +254,12 @@ export default function Sidebar() {
                 key={folder.path}
                 folder={folder}
                 selected={state.folders.selected === folder.path}
+                dragOver={dragOverPath === folder.path}
                 onClick={() => selectFolder(folder.path)}
                 onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setFolderMenu({ x: e.clientX, y: e.clientY, folder }) }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverPath(folder.path) }}
+                onDragLeave={() => setDragOverPath(null)}
+                onDrop={e => handleFolderDrop(folder, e)}
                 t={t}
               />
             ))}
@@ -253,8 +276,12 @@ export default function Sidebar() {
                 key={folder.path}
                 folder={folder}
                 selected={state.folders.selected === folder.path}
+                dragOver={dragOverPath === folder.path}
                 onClick={() => selectFolder(folder.path)}
                 onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setFolderMenu({ x: e.clientX, y: e.clientY, folder }) }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverPath(folder.path) }}
+                onDragLeave={() => setDragOverPath(null)}
+                onDrop={e => handleFolderDrop(folder, e)}
                 t={t}
               />
             ))}
@@ -320,16 +347,19 @@ export default function Sidebar() {
   )
 }
 
-function FolderItem({ folder, selected, onClick, onContextMenu, t }) {
+function FolderItem({ folder, selected, dragOver, onClick, onContextMenu, onDragOver, onDragLeave, onDrop, t }) {
   const IconComp = FOLDER_ICON_MAP[folder.special_use] || IconFolder
   const labelKey = FOLDER_LABEL_KEY[folder.special_use]
   const name = labelKey ? t(labelKey) : (folder.name || folder.path.split('/').pop())
 
   return (
     <div
-      className={`folder-item${selected ? ' active' : ''}`}
+      className={`folder-item${selected ? ' active' : ''}${dragOver ? ' drag-over' : ''}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}

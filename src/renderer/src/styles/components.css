@@ -240,6 +240,11 @@
   white-space: nowrap;
 }
 .folder-item.active .folder-item__name { color: var(--accent); font-weight: var(--weight-medium); }
+.folder-item.drag-over {
+  background: var(--accent-subtle);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
 
 .folder-item__badge {
   min-width: 18px;
