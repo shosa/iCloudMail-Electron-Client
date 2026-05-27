@@ -1,0 +1,185 @@
+/* ── Reset & Base ────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: var(--bg-base);
+  line-height: 1.5;
+  user-select: none;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.app-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  /* Subtle animated gradient backdrop */
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 40%, rgba(0,113,227,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 70%, rgba(94,94,188,0.07) 0%, transparent 55%),
+    var(--bg-base);
+}
+
+/* ── Title bar ───────────────────────────────────────────────────────────── */
+
+.titlebar {
+  height: var(--titlebar-height);
+  min-height: var(--titlebar-height);
+  background: var(--titlebar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  /* Leave ~150px on the right for native Win11 min/max/close controls */
+  padding: 0 150px 0 var(--sp-3);
+  -webkit-app-region: drag;
+  position: relative;
+  z-index: 100;
+}
+
+.titlebar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.titlebar__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
+}
+
+.titlebar__status {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.titlebar__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--text-tertiary);
+}
+
+.titlebar__status-dot--connected { background: var(--color-success); }
+.titlebar__status-dot--connecting { background: var(--color-warning); animation: pulse 1.5s ease infinite; }
+.titlebar__status-dot--error { background: var(--color-error); }
+
+.titlebar__controls {
+  display: flex;
+  gap: var(--sp-2);
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+  width: 28px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--glass-fill);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+.titlebar-btn:hover { background: var(--glass-fill-hover); color: var(--text-primary); }
+.titlebar-btn--close:hover { background: var(--color-error); color: white; }
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* ── Focus ───────────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+h1 { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: var(--weight-bold); }
+h2 { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold); }
+h3 { font-family: var(--font-display); font-size: var(--text-xl);  font-weight: var(--weight-semibold); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

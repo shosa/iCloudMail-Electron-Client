@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+out/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Database files (stored in %APPDATA% at runtime, but just in case)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# electron-builder cache
+.cache/

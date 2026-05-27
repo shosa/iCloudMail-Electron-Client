@@ -1,0 +1,121 @@
+/* ── Liquid Glass Design Tokens ─────────────────────────────────────────── */
+
+:root {
+  /* Base palette */
+  --bg-base:            #0a0a0f;
+  --bg-layer1:          rgba(18, 18, 28, 0.85);
+  --bg-layer2:          rgba(26, 26, 40, 0.75);
+  --bg-layer3:          rgba(34, 34, 52, 0.6);
+
+  /* Glass surfaces */
+  --glass-fill:         rgba(255, 255, 255, 0.07);
+  --glass-fill-hover:   rgba(255, 255, 255, 0.10);
+  --glass-fill-active:  rgba(255, 255, 255, 0.14);
+  --glass-border:       rgba(255, 255, 255, 0.12);
+  --glass-border-light: rgba(255, 255, 255, 0.18);
+  --glass-inner-glow:   inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --glass-shadow:       0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* Sidebar (frosted) */
+  --sidebar-bg:         rgba(30, 30, 40, 0.6);
+  --sidebar-blur:       blur(60px);
+  --sidebar-width:      220px;
+  --msglist-width:      380px;
+
+  /* Accent — iCloud Blue */
+  --accent:             #0071e3;
+  --accent-hover:       #0077ed;
+  --accent-active:      #006bd6;
+  --accent-glow:        rgba(0, 113, 227, 0.35);
+  --accent-subtle:      rgba(0, 113, 227, 0.15);
+
+  /* Text */
+  --text-primary:       rgba(255, 255, 255, 0.92);
+  --text-secondary:     rgba(255, 255, 255, 0.55);
+  --text-tertiary:      rgba(255, 255, 255, 0.30);
+  --text-on-accent:     #ffffff;
+
+  /* Status colors */
+  --color-success:      #30d158;
+  --color-warning:      #ff9f0a;
+  --color-error:        #ff453a;
+  --color-unread:       var(--accent);
+
+  /* Typography */
+  --font-sans:          -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display:       -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  --font-mono:          'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --text-xs:    11px;
+  --text-sm:    12px;
+  --text-base:  14px;
+  --text-md:    15px;
+  --text-lg:    17px;
+  --text-xl:    20px;
+  --text-2xl:   24px;
+  --text-3xl:   32px;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  /* Spacing */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+
+  /* Radius */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  18px;
+  --radius-xl:  24px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:     cubic-bezier(0, 0, 0.2, 1);
+  --duration-fast:   150ms;
+  --duration-base:   250ms;
+  --duration-slow:   400ms;
+
+  /* Title bar */
+  --titlebar-height: 32px;
+  --titlebar-bg: rgba(10, 10, 15, 0.8);
+  --titlebar-overlay-color: rgba(10,10,15,0);
+}
+
+
+/* ── Theme transition ────────────────────────────────────────────────────── */
+/* Applied to root so all CSS-variable-driven properties interpolate smoothly */
+.app-root {
+  transition:
+    background-color var(--duration-slow) var(--ease-default),
+    color var(--duration-slow) var(--ease-default);
+}
+
+/* Light theme overrides */
+.theme-light {
+  --bg-base:            #f0f0f5;
+  --bg-layer1:          rgba(245, 245, 250, 0.9);
+  --bg-layer2:          rgba(240, 240, 248, 0.8);
+  --glass-fill:         rgba(255, 255, 255, 0.55);
+  --glass-fill-hover:   rgba(255, 255, 255, 0.7);
+  --glass-fill-active:  rgba(255, 255, 255, 0.85);
+  --glass-border:       rgba(0, 0, 0, 0.10);
+  --glass-border-light: rgba(0, 0, 0, 0.15);
+  --glass-inner-glow:   inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --glass-shadow:       0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --sidebar-bg:         rgba(220, 220, 235, 0.7);
+  --text-primary:       rgba(0, 0, 0, 0.88);
+  --text-secondary:     rgba(0, 0, 0, 0.5);
+  --text-tertiary:      rgba(0, 0, 0, 0.28);
+  --titlebar-bg:        rgba(240, 240, 248, 0.85);
+  --titlebar-overlay-color: rgba(240,240,248,0);
+}
