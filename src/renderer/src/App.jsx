@@ -80,7 +80,7 @@ export default function App() {
 
   if (!state.auth.isAuthenticated) {
     return (
-      <div className="app-root">
+      <div className="app-root theme-light">
         <TitleBar />
         <SetupScreen />
       </div>
@@ -88,7 +88,7 @@ export default function App() {
   }
 
   return (
-    <div className={`app-root theme-${state.settings.theme || 'dark'}`}>
+    <div className={`app-root theme-${state.settings.theme || 'light'}`}>
       <TitleBar connectionStatus={state.connectionStatus} />
       <div className="app-layout">
         <Sidebar />
