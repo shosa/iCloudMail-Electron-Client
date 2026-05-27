@@ -113,21 +113,58 @@ function updateTrayMenu() {
     }
   ])
   tray.setContextMenu(contextMenu)
+  updateTaskbarBadge(totalUnread)
 }
 
-function showNewMailNotification(subject, from) {
+function updateTaskbarBadge(count) {
+  if (!mainWindow) return
+  if (count > 0) {
+    try {
+      const size = 16
+      const canvas = Buffer.alloc(size * size * 4)
+      const cx = size / 2, cy = size / 2, r = size / 2 - 1
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+          const idx = (y * size + x) * 4
+          if (dist <= r) {
+            canvas[idx]     = 255
+            canvas[idx + 1] = 69
+            canvas[idx + 2] = 58
+            canvas[idx + 3] = 255
+          }
+        }
+      }
+      const overlay = nativeImage.createFromBuffer(canvas, { width: size, height: size })
+      mainWindow.setOverlayIcon(overlay, `${count} unread`)
+    } catch { /* overlay icon not supported */ }
+  } else {
+    try { mainWindow.setOverlayIcon(null, '') } catch { /* ignore */ }
+  }
+}
+
+function showNewMailNotification(subject, from, folder) {
+  try {
+    const settings = getSettings()
+    if (!settings.notificationsEnabled) return
+    const notifyFolders = settings.notifyFolders || ['INBOX']
+    if (!notifyFolders.includes(folder)) return
+  } catch { /* proceed anyway if settings unavailable */ }
+
   if (Notification.isSupported()) {
-    const n = new Notification({
-      title: 'New Mail',
-      body: `From: ${from}\n${subject}`,
-      icon: join(process.resourcesPath || __dirname, '../../resources/icon.ico'),
-      silent: false
-    })
-    n.on('click', () => {
-      mainWindow?.show()
-      mainWindow?.focus()
-    })
-    n.show()
+    try {
+      const n = new Notification({
+        title: 'New Mail',
+        body: `From: ${from}\n${subject}`,
+        silent: false
+      })
+      n.on('click', () => {
+        mainWindow?.show()
+        mainWindow?.focus()
+        mainWindow?.webContents.send('imap:notification-click', { folder })
+      })
+      n.show()
+    } catch { /* Notification construction failed */ }
   }
 }
 
@@ -138,7 +175,7 @@ function _attachClientEvents(email, client) {
     const cur = unreadCounts.get(email) || 0
     unreadCounts.set(email, cur + 1)
     updateTrayMenu()
-    showNewMailNotification(subject, from)
+    showNewMailNotification(subject, from, folder)
     mainWindow?.webContents.send('imap:new-mail', { subject, from, folder, uid, account: email })
   })
   client.on('connection-status', (status) => {
@@ -556,6 +593,10 @@ ipcMain.handle('window:maximize', () => {
   else mainWindow?.maximize()
 })
 ipcMain.handle('window:close', () => mainWindow?.hide())
+ipcMain.handle('window:set-badge', (_e, count) => {
+  const n = Math.max(0, count)
+  updateTaskbarBadge(n)
+})
 
 ipcMain.handle('window:open-message', async (_e, msg) => {
   try {

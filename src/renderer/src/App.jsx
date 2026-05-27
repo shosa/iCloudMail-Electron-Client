@@ -27,11 +27,21 @@ export default function App() {
     const offCompose = window.api.on('open-compose', (data) => {
       dispatch({ type: 'OPEN_COMPOSE', payload: data })
     })
+    const offSync = window.api.on('imap:sync-complete', ({ folder, newCount }) => {
+      if (newCount > 0) {
+        dispatch({ type: 'SYNC_COMPLETE', payload: { folder, newCount } })
+      }
+    })
+    const offNotifClick = window.api.on('imap:notification-click', ({ folder }) => {
+      dispatch({ type: 'SELECT_FOLDER', payload: folder })
+    })
 
     return () => {
       offNewMail?.()
       offStatus?.()
       offCompose?.()
+      offSync?.()
+      offNotifClick?.()
     }
   }, [dispatch])
 
