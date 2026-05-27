@@ -239,6 +239,20 @@ export default function Sidebar() {
 
   return (
     <div className="sidebar" onClick={() => { setFolderMenu(null); setAvatarMenu(false) }}>
+      {state.accounts.list.length > 1 && (
+        <div className="sidebar__accounts">
+          {state.accounts.list.map(acc => (
+            <button
+              key={acc.email}
+              className={`sidebar__account-btn${state.accounts.activeEmail === acc.email ? ' active' : ''}`}
+              onClick={() => dispatch({ type: 'SWITCH_ACCOUNT', payload: acc.email })}
+              title={acc.email}
+            >
+              {(acc.display_name || acc.email).slice(0, 2).toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="sidebar__folders">
         {state.folders.loading && state.folders.list.length === 0 && (
           <div style={{ padding: 'var(--sp-4)', textAlign: 'center' }}>
