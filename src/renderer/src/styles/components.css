@@ -462,7 +462,7 @@
 .message-item {
   display: flex;
   gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
+  padding: calc(var(--sp-3) * var(--density-scale)) var(--sp-4);
   border-bottom: 1px solid rgba(255,255,255,0.04);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-default);

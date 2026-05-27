@@ -1,4 +1,7 @@
 import React, { useState } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import { IconClose, IconSignOut, IconLanguage, IconClearCache } from './Icons'
@@ -26,7 +29,8 @@ export default function Settings() {
     syncInterval: s.syncInterval || 5,
     signature: s.signature || '',
     theme: s.theme || 'light',
-    language: s.language || 'en'
+    language: s.language || 'en',
+    displayDensity: s.displayDensity || 'comfortable'
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -37,6 +41,21 @@ export default function Settings() {
   const [dbPath, setDbPath] = useState('')
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetting, setResetting] = useState(false)
+
+  const sigEditor = useEditor({
+    extensions: [StarterKit, Underline],
+    content: local.signature || '',
+    onUpdate: ({ editor }) => {
+      setLocal(s => ({ ...s, signature: editor.getHTML() }))
+    }
+  })
+
+  function handleDensityChange(density) {
+    setLocal(s => ({ ...s, displayDensity: density }))
+    document.documentElement.style.setProperty('--density-scale', {
+      compact: '0.85', comfortable: '1', spacious: '1.15'
+    }[density] || '1')
+  }
 
   function update(key, value) {
     setLocal(prev => ({ ...prev, [key]: value }))
@@ -191,13 +210,63 @@ export default function Settings() {
           {/* Signature */}
           <div className="settings-section">
             <div className="settings-section__title">{t('settings.signature')}</div>
-            <textarea
-              className="signature-editor"
-              placeholder={t('settings.signaturePlaceholder')}
-              value={local.signature}
-              onChange={e => update('signature', e.target.value)}
-              rows={4}
-            />
+            <div className="settings-section__label">Email Signature</div>
+            <div className="tiptap-editor settings-signature-editor">
+              {sigEditor && <EditorContent editor={sigEditor} />}
+            </div>
+          </div>
+
+          {/* Display Density */}
+          <div className="settings-section">
+            <div className="settings-section__title">Display</div>
+            <div className="settings-section">
+              <div className="settings-section__label">Display Density</div>
+              <div className="settings-radio-group">
+                {['compact', 'comfortable', 'spacious'].map(d => (
+                  <label key={d} className="settings-radio">
+                    <input
+                      type="radio"
+                      name="density"
+                      value={d}
+                      checked={(local.displayDensity || 'comfortable') === d}
+                      onChange={() => handleDensityChange(d)}
+                    />
+                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="settings-section">
+              <div className="settings-section__label">Theme</div>
+              <div className="settings-radio-group">
+                {['light', 'dark'].map(t => (
+                  <label key={t} className="settings-radio">
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={t}
+                      checked={(local.theme || 'light') === t}
+                      onChange={() => {
+                        setLocal(s => ({ ...s, theme: t }))
+                        dispatch({ type: 'UPDATE_SETTINGS', payload: { theme: t } })
+                      }}
+                    />
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="settings-section">
+              <div className="settings-section__label">Notifications</div>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={!!local.notificationsEnabled}
+                  onChange={e => setLocal(s => ({ ...s, notificationsEnabled: e.target.checked }))}
+                />
+                Enable new mail notifications
+              </label>
+            </div>
           </div>
 
           {/* Data */}

@@ -85,6 +85,9 @@
   --duration-base:   250ms;
   --duration-slow:   400ms;
 
+  /* Display density */
+  --density-scale: 1;
+
   /* Title bar */
   --titlebar-height: 32px;
   --titlebar-bg: rgba(10, 10, 15, 0.8);
