@@ -1,7 +1,6 @@
-import { safeStorage } from 'electron'
+import { safeStorage, app } from 'electron'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { app } from 'electron'
 
 function credsDir() {
   const dir = join(app.getPath('userData'), 'auth')
@@ -10,7 +9,8 @@ function credsDir() {
 }
 
 function credsFile(email) {
-  return join(credsDir(), `${email.replace(/[^a-z0-9@._-]/gi, '_')}.bin`)
+  const safe = email.replace(/[^a-z0-9@._-]/gi, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+  return join(credsDir(), `${safe}.bin`)
 }
 
 export async function saveCredentials(email, password) {
@@ -20,16 +20,17 @@ export async function saveCredentials(email, password) {
 }
 
 export async function getCredentials(email) {
+  if (!safeStorage.isEncryptionAvailable()) return null
   if (email) {
-    const path = credsFile(email)
-    if (!existsSync(path)) return null
+    const filePath = credsFile(email)
+    if (!existsSync(filePath)) return null
     try {
-      const buf = readFileSync(path)
+      const buf = readFileSync(filePath)
       return JSON.parse(safeStorage.decryptString(buf))
     } catch { return null }
   }
   const dir = credsDir()
-  const files = readdirSync(dir).filter(f => f.endsWith('.bin'))
+  const files = readdirSync(dir).filter(f => f.endsWith('.bin')).sort()
   if (!files.length) return null
   try {
     const buf = readFileSync(join(dir, files[0]))
@@ -39,15 +40,18 @@ export async function getCredentials(email) {
 
 export async function deleteCredentials(email) {
   if (email) {
-    const path = credsFile(email)
-    if (existsSync(path)) unlinkSync(path)
+    const filePath = credsFile(email)
+    if (existsSync(filePath)) unlinkSync(filePath)
     return
   }
   const dir = credsDir()
-  readdirSync(dir).filter(f => f.endsWith('.bin')).forEach(f => unlinkSync(join(dir, f)))
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.bin'))) {
+    try { unlinkSync(join(dir, f)) } catch { /* skip locked file */ }
+  }
 }
 
 export async function listStoredEmails() {
+  if (!safeStorage.isEncryptionAvailable()) return []
   const dir = credsDir()
   const files = readdirSync(dir).filter(f => f.endsWith('.bin'))
   const emails = []
