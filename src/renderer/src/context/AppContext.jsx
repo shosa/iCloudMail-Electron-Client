@@ -184,7 +184,7 @@ function reducer(state, action) {
         ...state,
         accounts: { ...state.accounts, activeEmail: action.payload },
         folders: { ...state.folders, selected: 'INBOX', list: [] },
-        messages: { ...state.messages, list: [], selected: null, page: 1 }
+        messages: { ...state.messages, list: [], selected: null, page: 1, searchQuery: '', searchResults: null }
       }
     case 'ADD_ACCOUNT':
       return {
@@ -218,7 +218,10 @@ export function AppProvider({ children }) {
   // Check for existing credentials on mount
   useEffect(() => {
     async function checkAuth() {
-      const accRes = await window.api.accounts.list()
+      let accRes = { ok: false }
+      try {
+        accRes = await window.api.accounts.list()
+      } catch { /* IPC failure — fall through to credential check */ }
       if (accRes.ok && accRes.accounts?.length) {
         dispatch({ type: 'SET_ACCOUNTS', payload: accRes.accounts })
         dispatch({ type: 'SET_AUTHENTICATED', payload: accRes.accounts[0].email })
