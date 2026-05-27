@@ -61,6 +61,7 @@ export default function MessageList() {
   const [selectedKeys, setSelectedKeys] = useState(new Set())
   const [filter, setFilter] = useState('all')
   const [sortBy, setSortBy] = useState('date-desc')
+  const [expandedThreads, setExpandedThreads] = useState(new Set())
 
   const folder = state.folders.selected
 
@@ -79,6 +80,7 @@ export default function MessageList() {
 
   useEffect(() => { if (folder) loadMessages(1) }, [folder, loadMessages])
   useEffect(() => { if (state.messages._newMailSignal) loadMessages(1) }, [state.messages._newMailSignal, loadMessages])
+  useEffect(() => { if (state.messages._syncSignal) loadMessages(1) }, [state.messages._syncSignal, loadMessages])
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = 0 }, [folder])
 
   // Clear multi-selection and reset filters when folder changes
@@ -244,6 +246,25 @@ export default function MessageList() {
 
   const primaryUid = state.messages.selected?.uid
 
+  function groupByThread(messages) {
+    const threadMap = new Map()
+    for (const msg of messages) {
+      const tid = msg.thread_id || `single-${msg.uid}-${msg.folder}`
+      if (!threadMap.has(tid)) threadMap.set(tid, [])
+      threadMap.get(tid).push(msg)
+    }
+    for (const msgs of threadMap.values()) {
+      msgs.sort((a, b) => (a.date || 0) - (b.date || 0))
+    }
+    return [...threadMap.entries()]
+      .map(([threadId, msgs]) => ({
+        threadId,
+        messages: msgs,
+        latest: msgs.reduce((a, b) => (b.date || 0) > (a.date || 0) ? b : a)
+      }))
+      .sort((a, b) => (b.latest.date || 0) - (a.latest.date || 0))
+  }
+
   return (
     <div className="message-list" onClick={e => { if (!e.defaultPrevented) setContextMenu(null) }}>
       <div className="message-list__header">
@@ -305,27 +326,44 @@ export default function MessageList() {
         </div>
       ) : (
         <div className="message-list__body" ref={listRef} onScroll={handleScroll}>
-          {displayMessages.map(msg => (
-            <MessageItem
-              key={msgKey(msg)}
-              message={msg}
-              selected={primaryUid === msg.uid && selectedKeys.size === 0}
-              multiSelected={selectedKeys.has(msgKey(msg))}
-              onClick={e => handleItemClick(e, msg)}
-              onDoubleClick={() => window.api.window.openMessage(msg)}
-              onContextMenu={e => handleItemContextMenu(e, msg)}
-              onDragStart={e => {
-                const isInSelection = selectedKeys.has(msgKey(msg)) && selectedKeys.size > 1
-                const toMove = isInSelection
-                  ? displayMessages.filter(m => selectedKeys.has(msgKey(m)))
-                  : [msg]
-                e.dataTransfer.setData('x-mail-messages', JSON.stringify(
-                  toMove.map(m => ({ uid: m.uid, folder: m.folder }))
-                ))
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-            />
-          ))}
+          {groupByThread(displayMessages).map(({ threadId, messages: threadMsgs, latest }) => {
+            const isExpanded = expandedThreads.has(threadId)
+            const isMulti    = threadMsgs.length > 1
+            const msgsToShow = isExpanded ? threadMsgs : [latest]
+
+            return (
+              <React.Fragment key={threadId}>
+                {msgsToShow.map((msg, idx) => (
+                  <MessageItem
+                    key={`${msg.folder}-${msg.uid}`}
+                    message={msg}
+                    selected={primaryUid === msg.uid && selectedKeys.size === 0}
+                    multiSelected={selectedKeys.has(msgKey(msg))}
+                    threadCount={idx === 0 && isMulti ? threadMsgs.length : null}
+                    isThreadChild={idx > 0}
+                    onThreadExpand={isMulti && idx === 0 ? () => setExpandedThreads(prev => {
+                      const next = new Set(prev)
+                      next.has(threadId) ? next.delete(threadId) : next.add(threadId)
+                      return next
+                    }) : null}
+                    onClick={e => handleItemClick(e, msg)}
+                    onDoubleClick={() => window.api.window.openMessage(msg)}
+                    onContextMenu={e => handleItemContextMenu(e, msg)}
+                    onDragStart={e => {
+                      const isInSelection = selectedKeys.has(msgKey(msg)) && selectedKeys.size > 1
+                      const toMove = isInSelection
+                        ? displayMessages.filter(m => selectedKeys.has(msgKey(m)))
+                        : [msg]
+                      e.dataTransfer.setData('x-mail-messages', JSON.stringify(
+                        toMove.map(m => ({ uid: m.uid, folder: m.folder }))
+                      ))
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
+                  />
+                ))}
+              </React.Fragment>
+            )
+          })}
 
           {state.messages.hasMore && !state.messages.searchResults && (
             <div className="message-list__load-more">
@@ -355,7 +393,7 @@ export default function MessageList() {
   )
 }
 
-function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick, onContextMenu, onDragStart }) {
+function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart }) {
   const isUnread  = !message.flags?.includes('\\Seen')
   const isStarred = message.flags?.includes('\\Flagged')
   const initials  = getInitials(message.from_name, message.from_email)
@@ -363,7 +401,7 @@ function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick,
 
   return (
     <div
-      className={`message-item${selected ? ' selected' : ''}${isUnread ? ' unread' : ''}${multiSelected ? ' multi-selected' : ''}`}
+      className={`message-item${selected ? ' selected' : ''}${isUnread ? ' unread' : ''}${multiSelected ? ' multi-selected' : ''}${isThreadChild ? ' thread-child' : ''}`}
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
@@ -385,6 +423,13 @@ function MessageItem({ message, selected, multiSelected, onClick, onDoubleClick,
           <span className="message-item__sender">
             {message.from_name || message.from_email || '(Unknown)'}
           </span>
+          {threadCount && (
+            <span
+              className="message-item__thread-count"
+              onClick={e => { e.stopPropagation(); onThreadExpand?.() }}
+              title={`${threadCount} messages in thread`}
+            >{threadCount}</span>
+          )}
           {isStarred && !multiSelected && <IconStar size={12} style={{ color: '#ffd60a', fill: '#ffd60a', flexShrink: 0 }} />}
           <span className="message-item__time">{formatDate(message.date)}</span>
         </div>

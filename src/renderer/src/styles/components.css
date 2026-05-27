@@ -485,6 +485,28 @@
   background: var(--accent);
 }
 
+.message-item__thread-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--sp-1);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.message-item.thread-child {
+  padding-left: calc(var(--sp-4) + 24px);
+  border-left: 2px solid var(--glass-border);
+  margin-left: var(--sp-4);
+}
+
 .message-item__avatar {
   width: 36px;
   height: 36px;
