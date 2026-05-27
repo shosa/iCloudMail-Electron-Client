@@ -127,16 +127,6 @@ export default function Settings() {
 
             <div className="settings-row">
               <div className="settings-row__info">
-                <div className="settings-row__label">{t('settings.theme')}</div>
-              </div>
-              <select className="settings-select" value={local.theme} onChange={e => update('theme', e.target.value)}>
-                <option value="dark">{t('settings.themeDark')}</option>
-                <option value="light">{t('settings.themeLight')}</option>
-              </select>
-            </div>
-
-            <div className="settings-row">
-              <div className="settings-row__info">
                 <div className="settings-row__label">{t('settings.languageLabel')}</div>
               </div>
               <select className="settings-select" value={local.language} onChange={e => update('language', e.target.value)}>
@@ -162,19 +152,6 @@ export default function Settings() {
                 <div className="settings-row__desc">{t('settings.blockImagesDesc')}</div>
               </div>
               <Toggle checked={local.blockRemoteImages} onChange={v => update('blockRemoteImages', v)} />
-            </div>
-          </div>
-
-          {/* Notifications */}
-          <div className="settings-section">
-            <div className="settings-section__title">{t('settings.notifications')}</div>
-
-            <div className="settings-row">
-              <div className="settings-row__info">
-                <div className="settings-row__label">{t('settings.notificationsEnabled')}</div>
-                <div className="settings-row__desc">{t('settings.notificationsDesc')}</div>
-              </div>
-              <Toggle checked={local.notificationsEnabled} onChange={v => update('notificationsEnabled', v)} />
             </div>
           </div>
 
@@ -262,7 +239,7 @@ export default function Settings() {
                 <input
                   type="checkbox"
                   checked={!!local.notificationsEnabled}
-                  onChange={e => setLocal(s => ({ ...s, notificationsEnabled: e.target.checked }))}
+                  onChange={e => { setLocal(s => ({ ...s, notificationsEnabled: e.target.checked })); setSaved(false) }}
                 />
                 Enable new mail notifications
               </label>
