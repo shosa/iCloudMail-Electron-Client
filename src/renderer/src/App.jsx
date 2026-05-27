@@ -45,6 +45,39 @@ export default function App() {
     }
   }, [dispatch])
 
+  useEffect(() => {
+    if (!state.auth.isAuthenticated) return
+    function onKeyDown(e) {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      if (e.target.contentEditable === 'true') return
+
+      switch (e.key) {
+        case 'c':
+          if (!state.compose.isOpen) dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new' } })
+          break
+        case 'r':
+          if (state.messages.selected && !state.compose.isOpen) {
+            dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'reply', message: state.messages.selected } })
+          }
+          break
+        case 'Escape':
+          if (state.compose.isOpen) dispatch({ type: 'CLOSE_COMPOSE' })
+          else if (state.settings?.panelOpen) dispatch({ type: 'CLOSE_SETTINGS' })
+          break
+        case 'Delete':
+        case 'Backspace':
+          if (state.messages.selected && !state.compose.isOpen) {
+            const msg = state.messages.selected
+            dispatch({ type: 'REMOVE_MESSAGE', payload: { uid: msg.uid, folder: msg.folder } })
+            window.api.imap.deleteMessage(msg.folder, msg.uid, false)
+          }
+          break
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [state.auth.isAuthenticated, state.compose.isOpen, state.settings?.panelOpen, state.messages.selected, dispatch])
+
   if (!state.auth.isAuthenticated) {
     return (
       <div className="app-root">
