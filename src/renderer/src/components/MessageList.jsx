@@ -148,22 +148,32 @@ export default function MessageList() {
     const q = e.target.value
     setLocalSearch(q)
     clearTimeout(searchDebounce.current)
-    if (!q.trim()) { dispatch({ type: 'CLEAR_SEARCH' }); return }
+
+    if (!q.trim()) {
+      dispatch({ type: 'CLEAR_SEARCH' })
+      return
+    }
     dispatch({ type: 'SET_SEARCH_QUERY', payload: q })
-    searchDebounce.current = setTimeout(async () => {
-      load(t('loading.searching'))
-      const lr = await window.api.store.searchLocal(q)
+
+    // Show local FTS5 results immediately
+    window.api.store.searchLocal(q).then(lr => {
       if (lr.ok) dispatch({ type: 'SET_SEARCH_RESULTS', payload: lr.results })
+    })
+
+    // IMAP server search after 600ms debounce
+    searchDebounce.current = setTimeout(async () => {
+      const folder = state.folders.selected
       const sr = await window.api.imap.search(folder, q)
       if (sr.ok && sr.results?.length) {
+        const lr2 = await window.api.store.searchLocal(q)
+        const local = lr2.ok ? (lr2.results || []) : []
         const combined = [
-          ...(lr.results || []),
-          ...sr.results.filter(s => !(lr.results || []).some(l => l.uid === s.uid && l.folder === s.folder))
+          ...local,
+          ...sr.results.filter(s => !local.some(l => l.uid === s.uid && l.folder === s.folder))
         ]
         dispatch({ type: 'SET_SEARCH_RESULTS', payload: combined })
       }
-      done()
-    }, 400)
+    }, 600)
   }
 
   function clearSearch() {
