@@ -1109,6 +1109,27 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Skeleton loading ────────────────────────────────────────────────────── */
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+.skeleton {
+  background: var(--glass-fill);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.message-item--skeleton {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  align-items: flex-start;
+  pointer-events: none;
+}
+
 /* ── Toast notifications ─────────────────────────────────────────────────── */
 
 .toast-container {

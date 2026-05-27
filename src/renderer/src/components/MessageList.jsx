@@ -330,7 +330,18 @@ export default function MessageList() {
       )}
 
       {state.messages.loading && displayMessages.length === 0 ? (
-        <div className="message-list__empty"><div className="spinner" /></div>
+        <div className="message-list__body" style={{ pointerEvents: 'none' }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="message-item message-item--skeleton">
+              <div className="skeleton" style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="skeleton" style={{ width: '60%', height: 12 }} />
+                <div className="skeleton" style={{ width: '85%', height: 11 }} />
+                <div className="skeleton" style={{ width: '45%', height: 10 }} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : displayMessages.length === 0 ? (
         <div className="message-list__empty">
           <IconEnvelope size={40} style={{ opacity: 0.25, color: 'var(--text-tertiary)' }} />
