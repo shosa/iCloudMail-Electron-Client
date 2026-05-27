@@ -184,7 +184,7 @@ function reducer(state, action) {
         ...state,
         accounts: { ...state.accounts, activeEmail: action.payload },
         folders: { ...state.folders, selected: 'INBOX', list: [] },
-        messages: { ...state.messages, list: [], selected: null, page: 1, searchQuery: '', searchResults: null }
+        messages: { ...state.messages, list: [], selected: null, page: 1, searchQuery: '', searchResults: null, loading: false, hasMore: false, total: 0, _newMailSignal: null, _syncSignal: null }
       }
     case 'ADD_ACCOUNT':
       return {
