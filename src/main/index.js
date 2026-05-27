@@ -131,6 +131,8 @@ function showNewMailNotification(subject, from) {
 }
 
 function _attachClientEvents(email, client) {
+  if (client._listenersAttached) return
+  client._listenersAttached = true
   client.on('new-mail', ({ subject, from, folder, uid }) => {
     const cur = unreadCounts.get(email) || 0
     unreadCounts.set(email, cur + 1)
@@ -206,9 +208,13 @@ ipcMain.handle('imap:disconnect', async (_e, email) => {
   try {
     if (email) {
       const client = imapClients.get(email)
-      if (client) { await client.disconnect(); imapClients.delete(email) }
+      if (client) {
+        await client.disconnect().catch(() => {})
+        imapClients.delete(email)
+      }
     } else {
-      for (const [e, c] of imapClients) {
+      const entries = [...imapClients.entries()]
+      for (const [e, c] of entries) {
         await c.disconnect().catch(() => {})
         imapClients.delete(e)
       }
@@ -610,14 +616,22 @@ app.whenReady().then(async () => {
   createWindow()
   createTray()
 
-  const storedEmails = await listStoredEmails()
+  let storedEmails = []
+  try {
+    storedEmails = await listStoredEmails()
+  } catch (err) {
+    console.error('Could not load stored accounts:', err.message)
+  }
   for (const email of storedEmails) {
     const creds = await getCredentials(email)
     if (!creds) continue
     const client = new ImapClient(creds.email, creds.password)
     _attachClientEvents(creds.email, client)
     imapClients.set(creds.email, client)
-    client.connect().catch(err => console.error(`Auto-connect failed for ${creds.email}:`, err.message))
+    client.connect().catch(err => {
+      console.error(`Auto-connect failed for ${creds.email}:`, err.message)
+      imapClients.delete(creds.email)
+    })
   }
 })
 
