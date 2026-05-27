@@ -157,13 +157,15 @@ export default function MessageList() {
 
     // Show local FTS5 results immediately
     window.api.store.searchLocal(q).then(lr => {
-      if (lr.ok) dispatch({ type: 'SET_SEARCH_RESULTS', payload: lr.results })
+      if (lr.ok && state.messages.searchQuery === q) {
+        dispatch({ type: 'SET_SEARCH_RESULTS', payload: lr.results })
+      }
     })
 
     // IMAP server search after 600ms debounce
+    const currentFolder = state.folders.selected
     searchDebounce.current = setTimeout(async () => {
-      const folder = state.folders.selected
-      const sr = await window.api.imap.search(folder, q)
+      const sr = await window.api.imap.search(currentFolder, q)
       if (sr.ok && sr.results?.length) {
         const lr2 = await window.api.store.searchLocal(q)
         const local = lr2.ok ? (lr2.results || []) : []
