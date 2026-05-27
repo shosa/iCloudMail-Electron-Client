@@ -348,7 +348,7 @@ export default function MessageList() {
           <span>{localSearch ? t('messages.noResults') : t('messages.noMessages')}</span>
         </div>
       ) : (
-        <div className="message-list__body" ref={listRef} onScroll={handleScroll}>
+        <div className="message-list__body" ref={listRef} onScroll={handleScroll} role="list" aria-label="Messages">
           {groupByThread(displayMessages).map(({ threadId, messages: threadMsgs, latest }) => {
             const isExpanded = expandedThreads.has(threadId)
             const isMulti    = threadMsgs.length > 1
@@ -430,8 +430,10 @@ function MessageItem({ message, selected, multiSelected, threadCount, isThreadCh
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
-      role="button"
+      role="listitem"
       tabIndex={0}
+      aria-selected={selected}
+      aria-label={`${message.from_name || message.from_email}: ${message.subject}`}
       onKeyDown={e => e.key === 'Enter' && onClick(e)}
     >
       <div

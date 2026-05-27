@@ -377,6 +377,7 @@ function FolderItem({ folder, selected, dragOver, onClick, onContextMenu, onDrag
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}
+      aria-label={`${name}${folder.unread_count > 0 ? `, ${folder.unread_count} unread` : ''}`}
     >
       <span className="folder-item__icon"><IconComp size={16} /></span>
       <span className="folder-item__name">{name}</span>

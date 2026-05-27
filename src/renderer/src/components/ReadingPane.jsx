@@ -224,24 +224,28 @@ export default function ReadingPane() {
           className={`btn btn--icon${isStarred ? ' active' : ''}`}
           onClick={handleToggleStar}
           title={isStarred ? t('action.unstar') : t('action.star')}
+          aria-label={isStarred ? t('action.unstar') : t('action.star')}
         ><IconStar size={16} /></button>
 
         <button
           className="btn btn--icon"
           onClick={handleToggleRead}
           title={isRead ? t('action.markUnread') : t('action.markRead')}
+          aria-label={isRead ? t('action.markUnread') : t('action.markRead')}
         ><IconMarkRead size={16} /></button>
 
         <button
           className="btn btn--icon"
           onClick={handleMarkJunk}
           title={t('action.markJunk')}
+          aria-label={t('action.markJunk')}
         ><IconNoSymbol size={16} /></button>
 
         <button
           className="btn btn--icon btn--danger"
           onClick={handleDelete}
           title={t('action.delete')}
+          aria-label={t('action.delete')}
         ><IconTrash size={16} /></button>
       </div>
 
