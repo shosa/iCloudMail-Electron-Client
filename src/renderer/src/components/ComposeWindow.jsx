@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 
 function buildReplyBody(mode, msg, body) {
@@ -56,6 +57,9 @@ export default function ComposeWindow() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
+  const [attachments, setAttachments] = useState([])  // [{name, size, path}]
+  const [draftId, setDraftId] = useState(null)
+  const draftTimer = useRef(null)
 
   const editor = useEditor({
     extensions: [
@@ -63,8 +67,32 @@ export default function ComposeWindow() {
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Write your message…' })
+      Placeholder.configure({ placeholder: 'Write your message…' }),
+      Image.configure({ inline: true, allowBase64: true }),
     ],
+    editorProps: {
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items || []
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault()
+            const file = item.getAsFile()
+            if (!file) return false
+            const reader = new FileReader()
+            reader.onload = e => {
+              view.dispatch(
+                view.state.tr.replaceSelectionWith(
+                  view.state.schema.nodes.image.create({ src: e.target.result })
+                )
+              )
+            }
+            reader.readAsDataURL(file)
+            return true
+          }
+        }
+        return false
+      }
+    },
     content: ''
   })
 
@@ -85,6 +113,41 @@ export default function ComposeWindow() {
       setSubject(buildReplySubject(mode, msg.subject))
     }
   }, [mode, msg])
+
+  async function handleAttachFiles() {
+    const result = await window.api.dialog.pickFiles()
+    if (result.ok && result.files.length) {
+      setAttachments(prev => [...prev, ...result.files])
+    }
+  }
+
+  function removeAttachment(index) {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  useEffect(() => {
+    if (!state.auth.email) return
+    clearTimeout(draftTimer.current)
+    draftTimer.current = setTimeout(async () => {
+      const html = editor?.getHTML() || ''
+      if (!to && !subject && html === '<p></p>') return
+      const draft = {
+        id: draftId || undefined,
+        account_email: state.auth.email,
+        subject,
+        to_field: to,
+        cc_field: cc,
+        bcc_field: bcc,
+        body_html: html,
+        in_reply_to: msg?.message_id || null,
+        message_refs: msg?.message_id || null,
+        attachments
+      }
+      const result = await window.api.drafts.save(draft)
+      if (result.ok && result.id && !draftId) setDraftId(result.id)
+    }, 2000)
+    return () => clearTimeout(draftTimer.current)
+  }, [to, cc, bcc, subject, attachments])
 
   async function handleSend() {
     if (!to.trim()) { setError('Please enter a recipient'); return }
@@ -111,11 +174,13 @@ export default function ComposeWindow() {
       text,
       fromName: creds.creds.email,
       inReplyTo: msg?.message_id || undefined,
-      references: msg?.message_id || undefined
+      references: msg?.message_id || undefined,
+      attachments: attachments.map(a => ({ filename: a.name, path: a.path }))
     }
 
     const result = await window.api.smtp.send(creds.creds.email, creds.creds.password, mailOptions)
     if (result.ok) {
+      if (draftId) { window.api.drafts.delete(draftId); setDraftId(null) }
       setSent(true)
       setTimeout(() => dispatch({ type: 'CLOSE_COMPOSE' }), 1200)
     } else {
@@ -125,6 +190,7 @@ export default function ComposeWindow() {
   }
 
   function handleClose() {
+    if (draftId) window.api.drafts.delete(draftId)
     dispatch({ type: 'CLOSE_COMPOSE' })
   }
 
@@ -243,6 +309,9 @@ export default function ComposeWindow() {
           <ToolBtn onClick={() => editor?.chain().focus().toggleBlockquote().run()}
             active={editor?.isActive('blockquote')} title="Blockquote">"</ToolBtn>
 
+          <div className="compose-toolbar__separator" />
+          <ToolBtn onClick={handleAttachFiles} title="Attach files">📎</ToolBtn>
+
           <div className="compose-toolbar__spacer" />
         </div>
 
@@ -265,6 +334,26 @@ export default function ComposeWindow() {
               </div>
             )}
           </div>
+
+          {attachments.length > 0 && (
+            <div className="compose-attachments">
+              {attachments.map((att, i) => (
+                <div key={i} className="attachment-chip">
+                  <span className="truncate" style={{ maxWidth: 140 }}>{att.name}</span>
+                  <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                    {att.size > 1048576
+                      ? `${(att.size / 1048576).toFixed(1)} MB`
+                      : `${Math.round(att.size / 1024)} KB`}
+                  </span>
+                  <button
+                    className="btn btn--icon"
+                    style={{ width: 18, height: 18, fontSize: 10 }}
+                    onClick={() => removeAttachment(i)}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
             <button className="btn btn--ghost" onClick={handleClose}>Discard</button>
