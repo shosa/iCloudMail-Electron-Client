@@ -111,6 +111,25 @@ export default function ReadingPane() {
     window.api.imap.markJunk(msg.folder, msg.uid, true)
   }
 
+  async function handleDownloadAttachment(att, idx) {
+    if (!msg) return
+    try {
+      const result = await window.api.imap.downloadAttachment(
+        msg.folder, msg.uid,
+        att.partId || String(idx + 1),
+        att.filename,
+        state.auth.email
+      )
+      if (result.ok) {
+        window.api.shell.openExternal(`file://${result.filePath}`)
+      } else {
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'error', text: result.error || 'Download failed' } })
+      }
+    } catch (err) {
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'error', text: err.message } })
+    }
+  }
+
   if (!msg) {
     return (
       <div className="reading-pane">
@@ -261,7 +280,11 @@ export default function ReadingPane() {
       {attachments.length > 0 && (
         <div className="attachments-strip">
           {attachments.map((att, i) => (
-            <AttachmentChip key={i} attachment={att} />
+            <AttachmentChip
+              key={i}
+              attachment={att}
+              onDownload={() => handleDownloadAttachment(att, i)}
+            />
           ))}
         </div>
       )}
@@ -269,7 +292,8 @@ export default function ReadingPane() {
   )
 }
 
-function AttachmentChip({ attachment }) {
+function AttachmentChip({ attachment, onDownload }) {
+  const isImage = attachment.type?.startsWith('image/')
   const sizeStr = attachment.size
     ? attachment.size > 1048576
       ? `${(attachment.size / 1048576).toFixed(1)} MB`
@@ -277,10 +301,18 @@ function AttachmentChip({ attachment }) {
     : ''
 
   return (
-    <div className="attachment-chip" title={`Download ${attachment.filename}`}>
-      <IconAttach size={14} />
+    <div
+      className="attachment-chip attachment-chip--clickable"
+      onClick={onDownload}
+      title={`Download ${attachment.filename}`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onDownload()}
+    >
+      <span style={{ fontSize: 16 }}>{isImage ? '🖼' : '📄'}</span>
       <span className="truncate" style={{ maxWidth: 200 }}>{attachment.filename}</span>
       {sizeStr && <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{sizeStr}</span>}
+      <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>↓</span>
     </div>
   )
 }

@@ -737,6 +737,13 @@
   color: var(--text-primary);
   border-color: var(--glass-border-light);
 }
+.attachment-chip--clickable {
+  cursor: pointer;
+}
+.attachment-chip--clickable:hover {
+  background: var(--glass-fill-hover);
+  border-color: var(--glass-border-light);
+}
 
 /* ── Compose window ──────────────────────────────────────────────────────── */
 
