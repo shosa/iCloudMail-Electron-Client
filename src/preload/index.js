@@ -110,7 +110,8 @@ contextBridge.exposeInMainWorld('api', {
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
     openMessage: (msg) => ipcRenderer.invoke('window:open-message', msg),
-    openComposeInMain: (data) => ipcRenderer.invoke('window:open-compose-in-main', data)
+    openComposeInMain: (data) => ipcRenderer.invoke('window:open-compose-in-main', data),
+    setBadge: (count) => ipcRenderer.invoke('window:set-badge', count)
   },
 
   // ── Shell ───────────────────────────────────────────────────────────────────
