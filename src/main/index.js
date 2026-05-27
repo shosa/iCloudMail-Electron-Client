@@ -1,11 +1,12 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, shell, dialog } from 'electron'
 import { join } from 'path'
 import {
   initDB, closeDB, searchMessages, getSettings, saveSetting,
   getFolders, clearBodyCache, clearFolderCache, getDbPath, resetAllData,
   getAccounts, upsertAccount, deleteAccount,
   getDrafts, upsertDraft, deleteDraft,
-  getSyncState
+  getSyncState,
+  getAttachmentsMeta, markAttachmentDownloaded
 } from './store/db.js'
 import { saveCredentials, getCredentials, deleteCredentials, listStoredEmails } from './auth/index.js'
 import { ImapClient } from './imap/client.js'
@@ -607,6 +608,57 @@ ipcMain.handle('window:open-compose-in-main', (_e, data) => {
 
 ipcMain.handle('shell:open-external', (_e, url) => {
   if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+})
+
+// ── Dialog ────────────────────────────────────────────────────────────────────
+
+ipcMain.handle('dialog:pick-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    title: 'Attach Files'
+  })
+  if (result.canceled) return { ok: true, files: [] }
+  const { statSync } = await import('fs')
+  const { basename } = await import('path')
+  const files = result.filePaths.map(p => {
+    let size = 0
+    try { size = statSync(p).size } catch { /* ignore */ }
+    return { path: p, name: basename(p), size }
+  })
+  return { ok: true, files }
+})
+
+ipcMain.handle('imap:download-attachment', async (_e, folder, uid, partId, filename, email) => {
+  try {
+    const client = getClient(email)
+    if (!client) return { ok: false, error: 'Not connected' }
+
+    const { join } = await import('path')
+    const { mkdirSync } = await import('fs')
+    const attDir = join(app.getPath('userData'), 'attachments')
+    mkdirSync(attDir, { recursive: true })
+    const safeName = filename.replace(/[^a-z0-9._-]/gi, '_')
+    const dest = join(attDir, `${uid}_${partId}_${safeName}`)
+
+    const { downloaded, filePath } = await client.downloadAttachment(folder, uid, partId, dest)
+    if (downloaded) {
+      const metas = getAttachmentsMeta(uid, folder)
+      const meta = metas.find(m => m.part_id === partId && m.filename === filename)
+      if (meta) markAttachmentDownloaded(meta.id, filePath)
+    }
+    return { ok: true, filePath }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('imap:get-attachment-meta', async (_e, uid, folder) => {
+  try {
+    const metas = getAttachmentsMeta(uid, folder)
+    return { ok: true, metas }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 })
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
