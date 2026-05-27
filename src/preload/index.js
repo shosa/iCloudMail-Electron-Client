@@ -47,7 +47,13 @@ contextBridge.exposeInMainWorld('api', {
     bulkDelete: (folder, uids) =>
       ipcRenderer.invoke('imap:bulk-delete', folder, uids),
     bulkMove: (folder, uids, destination) =>
-      ipcRenderer.invoke('imap:bulk-move', folder, uids, destination)
+      ipcRenderer.invoke('imap:bulk-move', folder, uids, destination),
+    syncFolder: (folder) =>
+      ipcRenderer.invoke('imap:sync-folder', folder),
+    downloadAttachment: (folder, uid, partId, filename, email) =>
+      ipcRenderer.invoke('imap:download-attachment', folder, uid, partId, filename, email),
+    getAttachmentMeta: (uid, folder) =>
+      ipcRenderer.invoke('imap:get-attachment-meta', uid, folder)
   },
 
   // ── SMTP ────────────────────────────────────────────────────────────────────
@@ -73,7 +79,23 @@ contextBridge.exposeInMainWorld('api', {
     resetAllData: () =>
       ipcRenderer.invoke('store:reset-all-data'),
     getViewerData: (id) =>
-      ipcRenderer.invoke('store:get-viewer-data', id)
+      ipcRenderer.invoke('store:get-viewer-data', id),
+    getSyncState: (folder) =>
+      ipcRenderer.invoke('store:get-sync-state', folder)
+  },
+
+  // ── Accounts ────────────────────────────────────────────────────────────────
+  accounts: {
+    list:   ()        => ipcRenderer.invoke('accounts:list'),
+    save:   (account) => ipcRenderer.invoke('accounts:save', account),
+    delete: (email)   => ipcRenderer.invoke('accounts:delete', email)
+  },
+
+  // ── Drafts ──────────────────────────────────────────────────────────────────
+  drafts: {
+    list:   (accountEmail) => ipcRenderer.invoke('drafts:list', accountEmail),
+    save:   (draft)        => ipcRenderer.invoke('drafts:save', draft),
+    delete: (id)           => ipcRenderer.invoke('drafts:delete', id)
   },
 
   // ── Settings ────────────────────────────────────────────────────────────────
@@ -94,6 +116,11 @@ contextBridge.exposeInMainWorld('api', {
   // ── Shell ───────────────────────────────────────────────────────────────────
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
+  },
+
+  // ── Dialog ──────────────────────────────────────────────────────────────────
+  dialog: {
+    pickFiles: () => ipcRenderer.invoke('dialog:pick-files')
   },
 
   // ── Push events (main → renderer) ───────────────────────────────────────────
