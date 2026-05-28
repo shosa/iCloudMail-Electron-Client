@@ -1,5 +1,5 @@
 {
-  "name": "icloud-mail",
+  "name": "Kumo",
   "version": "1.0.0",
   "description": "iCloud Mail desktop client for Windows",
   "main": "out/main/index.js",
@@ -36,8 +36,8 @@
   },
   "build": {
     "extends": null,
-    "appId": "com.icloudmail.desktop",
-    "productName": "iCloud Mail",
+    "appId": "com.kumo.desktop",
+    "productName": "Kumo",
     "directories": {
       "buildResources": "resources",
       "output": "dist"
@@ -76,7 +76,7 @@
       "installerHeaderIcon": "resources/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "iCloud Mail"
+      "shortcutName": "Kumo"
     },
     "asar": true
   }
