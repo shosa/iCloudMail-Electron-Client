@@ -35,6 +35,7 @@
   "reading.noMessageDesc": "一覧からメッセージを選択してここに表示",
   "reading.noContent": "内容なし",
   "reading.imagesBlocked": "外部画像はブロックされています",
+  "reading.from": "差出人:",
   "reading.to": "宛先:",
   "reading.noSubject": "(件名なし)",
   "messages.noMessages": "メッセージなし",

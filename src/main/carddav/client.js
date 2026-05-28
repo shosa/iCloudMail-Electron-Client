@@ -47,6 +47,19 @@ async function followRedirects(url, method, auth, body, headers, maxRedirects = 
   throw new Error('Too many redirects')
 }
 
+// ── XML entity decoder ────────────────────────────────────────────────────────
+
+function decodeXmlEntities(str) {
+  return str
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
 // ── vCard parser ──────────────────────────────────────────────────────────────
 
 function unfoldVCard(raw) {
@@ -54,7 +67,8 @@ function unfoldVCard(raw) {
 }
 
 export function parseVCard(raw) {
-  const cleaned = raw.replace(/\r/g, '')
+  // Decode any XML entities (&#13; → \r, &apos; → ', etc.) then strip bare \r
+  const cleaned = decodeXmlEntities(raw).replace(/\r/g, '')
   const lines = unfoldVCard(cleaned).split('\n')
   const result = { emails: [], phones: [] }
 

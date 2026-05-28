@@ -35,6 +35,7 @@
   "reading.noMessageDesc": "Choisissez un message dans la liste pour le lire ici",
   "reading.noContent": "Aucun contenu",
   "reading.imagesBlocked": "Images distantes bloquées",
+  "reading.from": "De :",
   "reading.to": "À :",
   "reading.noSubject": "(Sans objet)",
   "messages.noMessages": "Aucun message",

@@ -35,6 +35,7 @@
   "reading.noMessageDesc": "Wähle eine Nachricht aus der Liste, um sie hier zu lesen",
   "reading.noContent": "Kein Inhalt",
   "reading.imagesBlocked": "Externe Bilder blockiert",
+  "reading.from": "Von:",
   "reading.to": "An:",
   "reading.noSubject": "(Kein Betreff)",
   "messages.noMessages": "Keine Nachrichten",

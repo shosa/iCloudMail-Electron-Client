@@ -753,6 +753,17 @@
   flex-shrink: 0;
 }
 
+.address-chip--large {
+  padding: 3px 10px 3px 4px;
+  font-size: var(--text-sm);
+}
+
+.address-chip--large .address-chip__avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
 .address-chip__name {
   overflow: hidden;
   text-overflow: ellipsis;

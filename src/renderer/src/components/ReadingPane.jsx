@@ -40,23 +40,27 @@ function addrColor(name) {
   return ADDR_COLORS[Math.abs(h) % ADDR_COLORS.length]
 }
 
-function AddressChip({ address, onCompose }) {
+function AddressChip({ address, onCompose, large }) {
   const a = typeof address === 'string' ? { email: address, name: '' } : (address || {})
-  const name = a.name || a.email || ''
   const email = a.email || ''
-  const color = addrColor(name)
+  const color = addrColor(a.name || email)
   const ini = getInitials(a.name, email)
 
   return (
-    <div className="address-chip" title={email} onClick={() => onCompose?.(email)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && onCompose?.(email)}>
+    <div
+      className={`address-chip${large ? ' address-chip--large' : ''}`}
+      title={email}
+      onClick={() => onCompose?.(email)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onCompose?.(email)}
+    >
       <div className="address-chip__avatar" style={{ background: color }}>{ini}</div>
       <span className="address-chip__name">{a.name || email}</span>
-      {a.name && a.email && (
-        <div className="address-chip__popover">
-          <div className="address-chip__popover-name">{a.name}</div>
-          <div className="address-chip__popover-email">{a.email}</div>
-        </div>
-      )}
+      <div className="address-chip__popover">
+        {a.name && <div className="address-chip__popover-name">{a.name}</div>}
+        <div className="address-chip__popover-email">{email}</div>
+      </div>
     </div>
   )
 }
@@ -200,8 +204,6 @@ export default function ReadingPane() {
 
   const isRead = msg.flags?.includes('\\Seen')
   const isStarred = msg.flags?.includes('\\Flagged')
-  const initials = getInitials(msg.from_name, msg.from_email)
-  const color = getAvatarColor(msg.from_name || msg.from_email)
   const textContent = body?.text || ''
 
   // Build attachment list: DB metadata is the source of truth (from bodyStructure),
@@ -297,10 +299,17 @@ export default function ReadingPane() {
         <h2 className="reading-pane__subject">{msg.subject || t('reading.noSubject')}</h2>
 
         <div className="reading-pane__meta">
-          <div className="reading-pane__meta-avatar" style={{ backgroundColor: color }}>{initials}</div>
           <div className="reading-pane__meta-info">
-            <div className="reading-pane__from">{msg.from_name || msg.from_email}</div>
-            {msg.from_name && <div className="reading-pane__from-email">{msg.from_email}</div>}
+            <div className="reading-pane__recipients">
+              <span className="reading-pane__recipients-label">{t('reading.from')}</span>
+              <div className="reading-pane__chips">
+                <AddressChip
+                  address={{ name: msg.from_name, email: msg.from_email }}
+                  large
+                  onCompose={em => dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })}
+                />
+              </div>
+            </div>
             {(msg.to_addresses?.length > 0) && (
               <div className="reading-pane__recipients">
                 <span className="reading-pane__recipients-label">{t('reading.to')}</span>
