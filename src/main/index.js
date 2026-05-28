@@ -6,17 +6,29 @@ import {
   getAccounts, upsertAccount, deleteAccount,
   getDrafts, upsertDraft, deleteDraft,
   getSyncState,
-  getAttachmentsMeta, markAttachmentDownloaded
+  getAttachmentsMeta, markAttachmentDownloaded,
+  upsertContact, getContacts, searchContacts, deleteContacts,
+  upsertEvent, getEvents, deleteEvents
 } from './store/db.js'
 import { saveCredentials, getCredentials, deleteCredentials, listStoredEmails } from './auth/index.js'
 import { ImapClient } from './imap/client.js'
 import { sendEmail } from './smtp/index.js'
+import { syncContacts } from './carddav/client.js'
+import { syncCalendar } from './caldav/client.js'
 
 let mainWindow = null
 let tray = null
 const imapClients = new Map()   // email → ImapClient
 const unreadCounts = new Map()  // email → number
 const viewerDataStore = new Map()
+
+function getResourcePath(filename) {
+  if (process.env.ELECTRON_RENDERER_URL) {
+    // dev: app.getAppPath() is the project root
+    return join(app.getAppPath(), 'resources', filename)
+  }
+  return join(process.resourcesPath, filename)
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -40,7 +52,7 @@ function createWindow() {
       sandbox: false
     },
     show: false,
-    icon: join(process.resourcesPath || __dirname, '../../resources/icon.ico')
+    icon: getResourcePath('icon.ico')
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -62,7 +74,7 @@ function createWindow() {
 }
 
 function createTray() {
-  const iconPath = join(process.resourcesPath || __dirname, '../../resources/tray-icon.png')
+  const iconPath = getResourcePath('tray-icon.png')
   let icon
   try {
     icon = nativeImage.createFromPath(iconPath)
@@ -73,7 +85,7 @@ function createTray() {
 
   tray = new Tray(icon)
   updateTrayMenu()
-  tray.setToolTip('iCloud Mail')
+  tray.setToolTip('Kumo')
 
   tray.on('double-click', () => {
     if (mainWindow) {
@@ -83,29 +95,44 @@ function createTray() {
   })
 }
 
+const TRAY_STRINGS = {
+  en: { open: 'Open Kumo', openUnread: n => `Open — ${n} unread`, checkMail: 'Check Mail', quit: 'Quit' },
+  it: { open: 'Apri Kumo', openUnread: n => `Apri — ${n} non letti`, checkMail: 'Controlla posta', quit: 'Esci' },
+  fr: { open: 'Ouvrir Kumo', openUnread: n => `Ouvrir — ${n} non lus`, checkMail: 'Vérifier le courrier', quit: 'Quitter' },
+  de: { open: 'Kumo öffnen', openUnread: n => `Öffnen — ${n} ungelesen`, checkMail: 'E-Mails abrufen', quit: 'Beenden' },
+  es: { open: 'Abrir Kumo', openUnread: n => `Abrir — ${n} sin leer`, checkMail: 'Revisar correo', quit: 'Salir' },
+  ru: { open: 'Открыть Kumo', openUnread: n => `Открыть — ${n} непрочитанных`, checkMail: 'Проверить почту', quit: 'Выйти' },
+  jp: { open: 'Kumoを開く', openUnread: n => `開く — ${n}件の未読`, checkMail: 'メールを確認', quit: '終了' },
+  cn: { open: '打开 Kumo', openUnread: n => `打开 — ${n} 封未读`, checkMail: '检查邮件', quit: '退出' }
+}
+
 function updateTrayMenu() {
   if (!tray) return
   const totalUnread = [...unreadCounts.values()].reduce((a, b) => a + b, 0)
   const badge = totalUnread > 0 ? ` (${totalUnread})` : ''
-  tray.setToolTip(`iCloud Mail${badge}`)
+  tray.setToolTip(`Kumo${badge}`)
+
+  let lang = 'en'
+  try { lang = getSettings().language || 'en' } catch { /* use default */ }
+  const s = TRAY_STRINGS[lang] || TRAY_STRINGS.en
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: totalUnread > 0 ? `Open — ${totalUnread} unread` : 'Open iCloud Mail',
+      label: totalUnread > 0 ? s.openUnread(totalUnread) : s.open,
       click: () => {
         mainWindow?.show()
         mainWindow?.focus()
       }
     },
     {
-      label: 'Check Mail',
+      label: s.checkMail,
       click: () => {
         for (const client of imapClients.values()) client.syncInbox?.()
       }
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: s.quit,
       click: () => {
         tray = null
         app.quit()
@@ -185,8 +212,11 @@ function _attachClientEvents(email, client) {
     unreadCounts.set(email, count)
     updateTrayMenu()
   })
-  client.on('sync-complete', ({ folder, newCount }) => {
-    mainWindow?.webContents.send('imap:sync-complete', { folder, newCount, account: email })
+  client.on('sync-complete', ({ folder, newCount, removedCount }) => {
+    mainWindow?.webContents.send('imap:sync-complete', { folder, newCount, removedCount, account: email })
+  })
+  client.on('flags-updated', ({ folder, uid, flags }) => {
+    mainWindow?.webContents.send('imap:flags-updated', { folder, uid, flags, account: email })
   })
 }
 
@@ -543,6 +573,7 @@ ipcMain.handle('settings:get', async () => {
 ipcMain.handle('settings:save', async (_e, updates) => {
   try {
     for (const [key, value] of Object.entries(updates)) saveSetting(key, value)
+    updateTrayMenu()
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -583,6 +614,75 @@ ipcMain.handle('drafts:save', async (_e, draft) => {
 ipcMain.handle('drafts:delete', async (_e, id) => {
   try { deleteDraft(id); return { ok: true } }
   catch (err) { return { ok: false, error: err.message } }
+})
+
+// ── Contacts IPC ──────────────────────────────────────────────────────────────
+
+ipcMain.handle('contacts:sync', async (_e, email, password) => {
+  try {
+    const contacts = await syncContacts(email, password)
+    for (const c of contacts) upsertContact({ ...c, account_email: email })
+    return { ok: true, count: contacts.length }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('contacts:list', async (_e, email) => {
+  try {
+    const contacts = getContacts(email)
+    return { ok: true, contacts }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('contacts:search', async (_e, query, email) => {
+  try {
+    const contacts = searchContacts(query, email)
+    return { ok: true, contacts }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('contacts:clear', async (_e, email) => {
+  try {
+    deleteContacts(email)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+// ── Calendar IPC ──────────────────────────────────────────────────────────────
+
+ipcMain.handle('calendar:sync', async (_e, email, password) => {
+  try {
+    const events = await syncCalendar(email, password)
+    for (const ev of events) upsertEvent({ ...ev, account_email: email })
+    return { ok: true, count: events.length }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('calendar:events', async (_e, email, fromTs, toTs) => {
+  try {
+    const events = getEvents(email, fromTs, toTs)
+    return { ok: true, events }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('calendar:clear', async (_e, email) => {
+  try {
+    deleteEvents(email)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 })
 
 // ── Window controls ───────────────────────────────────────────────────────────
@@ -649,6 +749,10 @@ ipcMain.handle('window:open-compose-in-main', (_e, data) => {
 
 ipcMain.handle('shell:open-external', (_e, url) => {
   if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+})
+
+ipcMain.handle('shell:open-path', (_e, filePath) => {
+  return shell.openPath(filePath)
 })
 
 // ── Dialog ────────────────────────────────────────────────────────────────────

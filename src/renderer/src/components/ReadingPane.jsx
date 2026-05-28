@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import {
   IconReply, IconReplyAll, IconForward, IconStar, IconMarkRead,
-  IconTrash, IconNoSymbol, IconAttach, IconEnvelope
+  IconTrash, IconNoSymbol, IconAttach, IconEnvelope,
+  IconFileImage, IconFileDoc, IconDownload, IconClose
 } from './Icons'
 
 const AVATAR_COLORS = [
@@ -25,6 +26,39 @@ function getInitials(name, email) {
     return parts[0].slice(0, 2).toUpperCase()
   }
   return (email || '?').slice(0, 2).toUpperCase()
+}
+
+const ADDR_COLORS = [
+  '#0071e3','#5e5ebc','#bf5af2','#ff6b35',
+  '#30d158','#ffd60a','#ff453a','#64d2ff'
+]
+
+function addrColor(name) {
+  if (!name) return ADDR_COLORS[0]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return ADDR_COLORS[Math.abs(h) % ADDR_COLORS.length]
+}
+
+function AddressChip({ address, onCompose }) {
+  const a = typeof address === 'string' ? { email: address, name: '' } : (address || {})
+  const name = a.name || a.email || ''
+  const email = a.email || ''
+  const color = addrColor(name)
+  const ini = getInitials(a.name, email)
+
+  return (
+    <div className="address-chip" title={email} onClick={() => onCompose?.(email)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && onCompose?.(email)}>
+      <div className="address-chip__avatar" style={{ background: color }}>{ini}</div>
+      <span className="address-chip__name">{a.name || email}</span>
+      {a.name && a.email && (
+        <div className="address-chip__popover">
+          <div className="address-chip__popover-name">{a.name}</div>
+          <div className="address-chip__popover-email">{a.email}</div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function formatFullDate(ts) {
@@ -51,19 +85,26 @@ export default function ReadingPane() {
   const msg = state.messages.selected
   const [body, setBody] = useState(null)
   const [bodyLoading, setBodyLoading] = useState(false)
+  const [attachmentMeta, setAttachmentMeta] = useState([])
   const [imagesBlocked, setImagesBlocked] = useState(state.settings.blockRemoteImages)
   const [imagesLoadedByUser, setImagesLoadedByUser] = useState(false)
+  const [imagePreview, setImagePreview] = useState(null)
 
   useEffect(() => {
-    if (!msg) { setBody(null); return }
+    if (!msg) { setBody(null); setAttachmentMeta([]); return }
     setBody(null)
+    setAttachmentMeta([])
     setBodyLoading(true)
     setImagesLoadedByUser(false)
     setImagesBlocked(state.settings.blockRemoteImages)
     dispatch({ type: 'SET_LOADING', payload: t('loading.email') })
 
-    window.api.imap.fetchBody(msg.folder, msg.uid).then(result => {
-      if (result.ok) setBody(result.body)
+    Promise.all([
+      window.api.imap.fetchBody(msg.folder, msg.uid),
+      window.api.imap.getAttachmentMeta(msg.uid, msg.folder)
+    ]).then(([bodyResult, metaResult]) => {
+      if (bodyResult.ok) setBody(bodyResult.body)
+      if (metaResult.ok && metaResult.metas?.length) setAttachmentMeta(metaResult.metas)
       setBodyLoading(false)
       dispatch({ type: 'CLEAR_LOADING' })
     }).catch(() => { setBodyLoading(false); dispatch({ type: 'CLEAR_LOADING' }) })
@@ -113,20 +154,26 @@ export default function ReadingPane() {
 
   async function handleDownloadAttachment(att, idx) {
     if (!msg) return
+    const partId  = att.partId || String(idx + 1)
+    const isImage = att.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.filename || '')
     try {
       const result = await window.api.imap.downloadAttachment(
-        msg.folder, msg.uid,
-        att.partId || String(idx + 1),
-        att.filename,
-        state.auth.email
+        msg.folder, msg.uid, partId, att.filename, state.auth.email
       )
       if (result.ok) {
-        window.api.shell.openExternal(`file://${result.filePath}`)
+        if (isImage) {
+          // Normalize Windows backslashes → forward slashes for file:// URL
+          const src = 'file:///' + result.filePath.replace(/\\/g, '/')
+          setImagePreview({ src, filename: att.filename })
+        } else {
+          // shell.openPath handles Windows native paths correctly
+          window.api.shell.openPath(result.filePath)
+        }
       } else {
-        dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'error', text: result.error || 'Download failed' } })
+        console.error('Attachment download failed:', result.error)
       }
     } catch (err) {
-      dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'error', text: err.message } })
+      console.error('Attachment download error:', err.message)
     }
   }
 
@@ -134,7 +181,7 @@ export default function ReadingPane() {
     return (
       <div className="reading-pane">
         <div className="reading-pane__empty">
-          <div style={{ fontSize: 48, marginBottom: 'var(--sp-3)', opacity: 0.2 }}>✉️</div>
+          <div style={{ opacity: 0.2, marginBottom: 'var(--sp-3)' }}><IconEnvelope size={52} /></div>
           <span className="reading-pane__empty-text">{t('reading.noMessage')}</span>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', textAlign: 'center', maxWidth: 200 }}>
             {t('reading.noMessageDesc')}
@@ -156,7 +203,26 @@ export default function ReadingPane() {
   const initials = getInitials(msg.from_name, msg.from_email)
   const color = getAvatarColor(msg.from_name || msg.from_email)
   const textContent = body?.text || ''
-  const attachments = body?.attachments || []
+
+  // Build attachment list: DB metadata is the source of truth (from bodyStructure),
+  // supplemented by partId/type from simpleParser when available
+  const parsedAtts = body?.attachments || []
+  const attachments = (() => {
+    if (attachmentMeta.length > 0) {
+      return attachmentMeta
+        .filter(m => !m.is_inline || m.filename)  // skip inline images with no filename
+        .map(m => {
+          const parsed = parsedAtts.find(a => a.partId === m.part_id || a.filename === m.filename)
+          return {
+            filename: m.filename || 'attachment',
+            size: m.size || parsed?.size || 0,
+            type: m.content_type || parsed?.type || 'application/octet-stream',
+            partId: m.part_id
+          }
+        })
+    }
+    return parsedAtts
+  })()
 
   const hasRemoteImages = !!(body?.html && /src=["']https?:\/\//i.test(body.html))
 
@@ -196,6 +262,37 @@ export default function ReadingPane() {
 
   return (
     <div className="reading-pane">
+      {imagePreview && (
+        <div
+          className="image-preview-overlay"
+          onClick={() => setImagePreview(null)}
+          onKeyDown={e => e.key === 'Escape' && setImagePreview(null)}
+          role="dialog"
+          aria-label={t('reading.imagePreview')}
+        >
+          <div className="image-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="image-preview-modal__header">
+              <span className="truncate" style={{ fontSize: 'var(--text-sm)' }}>{imagePreview.filename}</span>
+              <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+                <button
+                  className="btn btn--ghost"
+                  style={{ fontSize: 'var(--text-sm)' }}
+                  onClick={() => window.api.shell.openExternal(imagePreview.src)}
+                >
+                  <IconDownload size={14} />
+                </button>
+                <button className="btn btn--icon" onClick={() => setImagePreview(null)} title={t('action.close')}>
+                  <IconClose size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="image-preview-modal__body">
+              <img src={imagePreview.src} alt={imagePreview.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="reading-pane__header">
         <h2 className="reading-pane__subject">{msg.subject || t('reading.noSubject')}</h2>
 
@@ -205,8 +302,27 @@ export default function ReadingPane() {
             <div className="reading-pane__from">{msg.from_name || msg.from_email}</div>
             {msg.from_name && <div className="reading-pane__from-email">{msg.from_email}</div>}
             {(msg.to_addresses?.length > 0) && (
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                {t('reading.to')} {(msg.to_addresses || []).map(a => a.name || a.email || a).join(', ')}
+              <div className="reading-pane__recipients">
+                <span className="reading-pane__recipients-label">{t('reading.to')}</span>
+                <div className="reading-pane__chips">
+                  {(msg.to_addresses || []).map((a, i) => (
+                    <AddressChip key={i} address={a} onCompose={em => {
+                      dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })
+                    }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {(msg.cc_addresses?.length > 0) && (
+              <div className="reading-pane__recipients">
+                <span className="reading-pane__recipients-label">{t('reading.cc')}</span>
+                <div className="reading-pane__chips">
+                  {(msg.cc_addresses || []).map((a, i) => (
+                    <AddressChip key={i} address={a} onCompose={em => {
+                      dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })
+                    }} />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -304,7 +420,7 @@ export default function ReadingPane() {
 }
 
 function AttachmentChip({ attachment, onDownload }) {
-  const isImage = attachment.type?.startsWith('image/')
+  const isImage = attachment.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(attachment.filename || '')
   const sizeStr = attachment.size
     ? attachment.size > 1048576
       ? `${(attachment.size / 1048576).toFixed(1)} MB`
@@ -315,15 +431,17 @@ function AttachmentChip({ attachment, onDownload }) {
     <div
       className="attachment-chip attachment-chip--clickable"
       onClick={onDownload}
-      title={`Download ${attachment.filename}`}
+      title={attachment.filename}
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onDownload()}
     >
-      <span style={{ fontSize: 16 }}>{isImage ? '🖼' : '📄'}</span>
+      <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+        {isImage ? <IconFileImage size={16} /> : <IconFileDoc size={16} />}
+      </span>
       <span className="truncate" style={{ maxWidth: 200 }}>{attachment.filename}</span>
       {sizeStr && <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{sizeStr}</span>}
-      <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>↓</span>
+      <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}><IconDownload size={13} /></span>
     </div>
   )
 }

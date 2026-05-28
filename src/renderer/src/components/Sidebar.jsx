@@ -5,7 +5,7 @@ import { useTranslation } from '../i18n/index'
 import {
   IconInbox, IconSent, IconDrafts, IconTrash, IconJunk,
   IconArchive, IconFolder, IconCompose, IconSettings, IconRefresh,
-  IconSignOut, IconMarkRead, IconNoSymbol
+  IconSignOut, IconMarkRead, IconNoSymbol, IconMail, IconContacts, IconCalendar
 } from './Icons'
 
 const FOLDER_ICON_MAP = {
@@ -190,17 +190,23 @@ export default function Sidebar() {
     dispatch({ type: 'SET_UNAUTHENTICATED' })
   }
 
+  async function syncSelectedFolder() {
+    if (state.folders.selected) {
+      await window.api.imap.syncFolder(state.folders.selected)
+    }
+  }
+
   async function handleFolderAction(folder, type) {
     switch (type) {
       case 'markAllRead':
         dispatch({ type: 'SET_LOADING', payload: t('loading.marking') })
         await window.api.imap.markAllRead(folder.path)
         dispatch({ type: 'CLEAR_LOADING' })
-        // Refresh folder counts
         loadFolders()
         break
       case 'refresh':
-        loadFolders()
+        await loadFolders()
+        await syncSelectedFolder()
         break
       case 'empty':
         dispatch({ type: 'SET_LOADING', payload: t('loading.deleting') })
@@ -237,6 +243,8 @@ export default function Sidebar() {
   const customFolders = sorted.filter(f => !f.special_use)
   const initials = state.auth.email ? state.auth.email.slice(0, 2).toUpperCase() : '?'
 
+  const currentView = state.view || 'mail'
+
   return (
     <div className="sidebar" onClick={() => { setFolderMenu(null); setAvatarMenu(false) }}>
       {state.accounts.list.length > 1 && (
@@ -253,7 +261,7 @@ export default function Sidebar() {
           ))}
         </div>
       )}
-      <div className="sidebar__folders">
+      <div className="sidebar__folders" style={{ visibility: currentView === 'mail' ? 'visible' : 'hidden', pointerEvents: currentView === 'mail' ? '' : 'none' }}>
         {state.folders.loading && state.folders.list.length === 0 && (
           <div style={{ padding: 'var(--sp-4)', textAlign: 'center' }}>
             <div className="spinner" style={{ margin: '0 auto' }} />
@@ -303,10 +311,32 @@ export default function Sidebar() {
         )}
       </div>
 
-      <button className="sidebar__compose-btn" onClick={openCompose}>
-        <IconCompose size={16} />
-        {t('sidebar.compose')}
-      </button>
+      <div className="sidebar__nav-tabs">
+        <button
+          className={`sidebar__nav-tab${state.view === 'mail' || !state.view ? ' active' : ''}`}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'mail' })}
+          title={t('nav.mail')}
+          aria-label={t('nav.mail')}
+        >
+          <IconMail size={20} />
+        </button>
+        <button
+          className={`sidebar__nav-tab${state.view === 'contacts' ? ' active' : ''}`}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'contacts' })}
+          title={t('nav.contacts')}
+          aria-label={t('nav.contacts')}
+        >
+          <IconContacts size={20} />
+        </button>
+        <button
+          className={`sidebar__nav-tab${state.view === 'calendar' ? ' active' : ''}`}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'calendar' })}
+          title={t('nav.calendar')}
+          aria-label={t('nav.calendar')}
+        >
+          <IconCalendar size={20} />
+        </button>
+      </div>
 
       <div className="sidebar__loading-bar">
         <div className="sidebar__loading-bar__label">
@@ -330,7 +360,7 @@ export default function Sidebar() {
           onKeyDown={e => e.key === 'Enter' && setAvatarMenu(v => !v)}
         >{initials}</div>
         <span style={{ flex: 1 }} />
-        <button className="btn btn--icon" onClick={loadFolders} title={t('sidebar.refresh')}>
+        <button className="btn btn--icon" onClick={async () => { await loadFolders(); await syncSelectedFolder() }} title={t('sidebar.refresh')}>
           <IconRefresh size={16} />
         </button>
       </div>

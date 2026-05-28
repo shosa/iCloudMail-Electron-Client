@@ -38,6 +38,10 @@ export default function Settings() {
   const [cacheCleared, setCacheCleared] = useState(false)
   const [clearingFolders, setClearingFolders] = useState(false)
   const [foldersCleared, setFoldersCleared] = useState(false)
+  const [clearingContacts, setClearingContacts] = useState(false)
+  const [contactsCleared, setContactsCleared] = useState(false)
+  const [clearingCalendar, setClearingCalendar] = useState(false)
+  const [calendarCleared, setCalendarCleared] = useState(false)
   const [dbPath, setDbPath] = useState('')
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -98,6 +102,24 @@ export default function Settings() {
     setClearingFolders(false)
     setFoldersCleared(true)
     setTimeout(() => setFoldersCleared(false), 2500)
+  }
+
+  async function handleClearContacts() {
+    setClearingContacts(true)
+    await window.api.contacts.clear(state.auth.email)
+    dispatch({ type: 'SET_CONTACTS', payload: [] })
+    setClearingContacts(false)
+    setContactsCleared(true)
+    setTimeout(() => setContactsCleared(false), 2500)
+  }
+
+  async function handleClearCalendar() {
+    setClearingCalendar(true)
+    await window.api.calendar.clear(state.auth.email)
+    dispatch({ type: 'SET_CALENDAR_EVENTS', payload: [] })
+    setClearingCalendar(false)
+    setCalendarCleared(true)
+    setTimeout(() => setCalendarCleared(false), 2500)
   }
 
   async function handleResetAllData() {
@@ -187,7 +209,7 @@ export default function Settings() {
           {/* Signature */}
           <div className="settings-section">
             <div className="settings-section__title">{t('settings.signature')}</div>
-            <div className="settings-section__label">Email Signature</div>
+            <div className="settings-section__label">{t('settings.signatureLabel')}</div>
             <div className="tiptap-editor settings-signature-editor">
               {sigEditor && <EditorContent editor={sigEditor} />}
             </div>
@@ -195,9 +217,9 @@ export default function Settings() {
 
           {/* Display Density */}
           <div className="settings-section">
-            <div className="settings-section__title">Display</div>
+            <div className="settings-section__title">{t('settings.display')}</div>
             <div className="settings-section">
-              <div className="settings-section__label">Display Density</div>
+              <div className="settings-section__label">{t('settings.displayDensity')}</div>
               <div className="settings-radio-group">
                 {['compact', 'comfortable', 'spacious'].map(d => (
                   <label key={d} className="settings-radio">
@@ -208,40 +230,40 @@ export default function Settings() {
                       checked={(local.displayDensity || 'comfortable') === d}
                       onChange={() => handleDensityChange(d)}
                     />
-                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                    {t(`settings.density.${d}`)}
                   </label>
                 ))}
               </div>
             </div>
             <div className="settings-section">
-              <div className="settings-section__label">Theme</div>
+              <div className="settings-section__label">{t('settings.theme')}</div>
               <div className="settings-radio-group">
-                {['light', 'dark'].map(t => (
-                  <label key={t} className="settings-radio">
+                {[['light', 'settings.themeLight'], ['dark', 'settings.themeDark'], ['system', 'settings.themeSystem']].map(([themeVal, labelKey]) => (
+                  <label key={themeVal} className="settings-radio">
                     <input
                       type="radio"
                       name="theme"
-                      value={t}
-                      checked={(local.theme || 'light') === t}
+                      value={themeVal}
+                      checked={(local.theme || 'light') === themeVal}
                       onChange={() => {
-                        setLocal(s => ({ ...s, theme: t }))
-                        dispatch({ type: 'UPDATE_SETTINGS', payload: { theme: t } })
+                        setLocal(s => ({ ...s, theme: themeVal }))
+                        dispatch({ type: 'UPDATE_SETTINGS', payload: { theme: themeVal } })
                       }}
                     />
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {t(labelKey)}
                   </label>
                 ))}
               </div>
             </div>
             <div className="settings-section">
-              <div className="settings-section__label">Notifications</div>
+              <div className="settings-section__label">{t('settings.notifications')}</div>
               <label className="settings-toggle">
                 <input
                   type="checkbox"
                   checked={!!local.notificationsEnabled}
                   onChange={e => { setLocal(s => ({ ...s, notificationsEnabled: e.target.checked })); setSaved(false) }}
                 />
-                Enable new mail notifications
+                {t('settings.notificationsEnabled')}
               </label>
             </div>
           </div>
@@ -285,6 +307,30 @@ export default function Settings() {
                 {clearingFolders ? <span className="spinner" style={{ width: 14, height: 14 }} />
                   : foldersCleared ? t('settings.clearCacheSuccess')
                   : <><IconClearCache size={15} /> {t('settings.clearFolderCache')}</>}
+              </button>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <div className="settings-row__label">{t('settings.clearContacts')}</div>
+                <div className="settings-row__desc">{t('settings.clearContactsDesc')}</div>
+              </div>
+              <button className="btn btn--ghost" onClick={handleClearContacts} disabled={clearingContacts} style={{ flexShrink: 0 }}>
+                {clearingContacts ? <span className="spinner" style={{ width: 14, height: 14 }} />
+                  : contactsCleared ? t('settings.clearContactsSuccess')
+                  : <><IconClearCache size={15} /> {t('settings.clearContacts')}</>}
+              </button>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <div className="settings-row__label">{t('settings.clearCalendar')}</div>
+                <div className="settings-row__desc">{t('settings.clearCalendarDesc')}</div>
+              </div>
+              <button className="btn btn--ghost" onClick={handleClearCalendar} disabled={clearingCalendar} style={{ flexShrink: 0 }}>
+                {clearingCalendar ? <span className="spinner" style={{ width: 14, height: 14 }} />
+                  : calendarCleared ? t('settings.clearCalendarSuccess')
+                  : <><IconClearCache size={15} /> {t('settings.clearCalendar')}</>}
               </button>
             </div>
 

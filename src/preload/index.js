@@ -116,7 +116,23 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Shell ───────────────────────────────────────────────────────────────────
   shell: {
-    openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
+    openExternal: (url)      => ipcRenderer.invoke('shell:open-external', url),
+    openPath:     (filePath) => ipcRenderer.invoke('shell:open-path', filePath)
+  },
+
+  // ── Contacts ────────────────────────────────────────────────────────────────
+  contacts: {
+    sync:   (email, password) => ipcRenderer.invoke('contacts:sync', email, password),
+    list:   (email)           => ipcRenderer.invoke('contacts:list', email),
+    search: (query, email)    => ipcRenderer.invoke('contacts:search', query, email),
+    clear:  (email)           => ipcRenderer.invoke('contacts:clear', email)
+  },
+
+  // ── Calendar ────────────────────────────────────────────────────────────────
+  calendar: {
+    sync:   (email, password)           => ipcRenderer.invoke('calendar:sync', email, password),
+    events: (email, fromTs, toTs)       => ipcRenderer.invoke('calendar:events', email, fromTs, toTs),
+    clear:  (email)                     => ipcRenderer.invoke('calendar:clear', email)
   },
 
   // ── Dialog ──────────────────────────────────────────────────────────────────
@@ -126,7 +142,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Push events (main → renderer) ───────────────────────────────────────────
   on: (channel, callback) => {
-    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'open-compose', 'imap:notification-click']
+    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'imap:flags-updated', 'open-compose', 'imap:notification-click']
     if (!allowed.includes(channel)) return
     const sub = (_event, ...args) => callback(...args)
     ipcRenderer.on(channel, sub)
