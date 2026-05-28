@@ -20,7 +20,7 @@ export default function TitleBar({ connectionStatus }) {
     <div className="titlebar">
       {/* Left: title + connection status — far from native Win controls on the right */}
       <div className="titlebar__left">
-        <span className="titlebar__title">iCloud Mail</span>
+        <span className="titlebar__title">Kumo</span>
         {statusLabel && (
           <div className="titlebar__status">
             <span className={`titlebar__status-dot ${dotClass}`} />

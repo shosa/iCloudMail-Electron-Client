@@ -655,6 +655,7 @@ ipcMain.handle('contacts:clear', async (_e, email) => {
   }
 })
 
+
 // ── Calendar IPC ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('calendar:sync', async (_e, email, password) => {
@@ -745,6 +746,48 @@ ipcMain.handle('window:open-compose-in-main', (_e, data) => {
   mainWindow?.show()
   mainWindow?.focus()
   return { ok: true }
+})
+
+ipcMain.handle('window:open-compose', async (_e, data) => {
+  try {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2)
+    viewerDataStore.set(id, data)
+
+    const composeWindow = new BrowserWindow({
+      width: 740,
+      height: 640,
+      minWidth: 520,
+      minHeight: 480,
+      frame: false,
+      backgroundColor: '#f5f5f7',
+      titleBarStyle: 'hidden',
+      titleBarOverlay: {
+        color: 'rgba(240,240,248,0)',
+        symbolColor: '#333333',
+        height: 32
+      },
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      },
+      show: false
+    })
+
+    if (process.env.ELECTRON_RENDERER_URL) {
+      composeWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}?compose=1&cid=${id}`)
+    } else {
+      composeWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+        query: { compose: '1', cid: id }
+      })
+    }
+
+    composeWindow.once('ready-to-show', () => composeWindow.show())
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 })
 
 ipcMain.handle('shell:open-external', (_e, url) => {

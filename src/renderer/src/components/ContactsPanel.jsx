@@ -18,10 +18,10 @@ function avatarColor(name) {
 function initials(name, email) {
   if (name) {
     const parts = name.trim().split(' ').filter(Boolean)
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
+    if (parts.length >= 2) return ([...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase()
+    return [...parts[0]].slice(0, 2).join('').toUpperCase()
   }
-  return (email || '?').slice(0, 2).toUpperCase()
+  return [...(email || '?')].slice(0, 2).join('').toUpperCase()
 }
 
 function ContactRow({ contact, selected, onClick }) {
@@ -117,8 +117,7 @@ export default function ContactsPanel() {
   const selected = state.contacts.selected
 
   function handleCompose(email) {
-    dispatch({ type: 'SET_VIEW', payload: 'mail' })
-    dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: email } } })
+    window.api.window.openCompose({ mode: 'new', to: email })
   }
 
   return (

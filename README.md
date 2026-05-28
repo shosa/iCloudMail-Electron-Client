@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="resources/tray-icon.svg" alt="iCloud Mail" width="96" height="96" />
+<img src="resources/icon.png" alt="iCloud Mail" width="96" height="96" />
 
-# iCloud Mail Desktop
+# Kumo
 
 **A native Windows mail client for iCloud accounts, built with Electron and React.**
 

@@ -6,8 +6,6 @@ import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import { useAppState, useAppDispatch } from '../context/AppContext'
-import { useTranslation } from '../i18n/index'
 import {
   IconClose, IconAttach, IconSend,
   IconBold, IconItalic, IconUnderlineF, IconStrike,
@@ -15,6 +13,7 @@ import {
   IconAlignLeft, IconAlignCenter, IconAlignRight,
   IconQuote
 } from './Icons'
+import { locales } from '../i18n/index'
 
 function buildReplyBody(mode, msg, body) {
   if (!msg) return ''
@@ -22,23 +21,18 @@ function buildReplyBody(mode, msg, body) {
   const dateLine = `Date: ${new Date(msg.date).toLocaleString()}`
   const subjectLine = `Subject: ${msg.subject}`
   const toLine = `To: ${(msg.to_addresses || []).map(a => a.name || a.email).join(', ')}`
-
   const original = body?.html
     ? `<blockquote style="border-left:3px solid #d2d2d7;margin:12px 0 0 8px;padding-left:12px;color:#6e6e73">${body.html}</blockquote>`
     : `<pre style="color:#6e6e73;font-size:13px">${body?.text || ''}</pre>`
-
   if (mode === 'forward') {
     return `<p></p><p>---------- Forwarded message ----------</p><p>${fromLine}<br>${dateLine}<br>${subjectLine}<br>${toLine}</p>${original}`
   }
-
   return `<p></p><p>On ${dateLine}, ${msg.from_name || msg.from_email} wrote:</p>${original}`
 }
 
 function buildReplySubject(mode, subject) {
   if (!subject) return mode === 'forward' ? 'Fwd: ' : 'Re: '
-  if (mode === 'forward') {
-    return subject.startsWith('Fwd:') ? subject : `Fwd: ${subject}`
-  }
+  if (mode === 'forward') return subject.startsWith('Fwd:') ? subject : `Fwd: ${subject}`
   return subject.startsWith('Re:') ? subject : `Re: ${subject}`
 }
 
@@ -51,8 +45,7 @@ function buildReplyTo(mode, msg) {
   return ''
 }
 
-function RecipientField({ label, value, onChange, placeholder, trailing }) {
-  const state = useAppState()
+function RecipientField({ label, value, onChange, placeholder, trailing, contacts }) {
   const [suggestions, setSuggestions] = useState([])
   const [focused, setFocused] = useState(false)
   const wrapRef = useRef(null)
@@ -60,14 +53,13 @@ function RecipientField({ label, value, onChange, placeholder, trailing }) {
   useEffect(() => {
     const q = value.split(/[,;]\s*/).pop().trim()
     if (!q || q.length < 2 || !focused) { setSuggestions([]); return }
-    const contacts = state.contacts?.list || []
     const lower = q.toLowerCase()
-    const matches = contacts.filter(c =>
+    const matches = (contacts || []).filter(c =>
       (c.display_name || '').toLowerCase().includes(lower) ||
       (c.email || '').toLowerCase().includes(lower)
     ).slice(0, 6)
     setSuggestions(matches)
-  }, [value, focused, state.contacts?.list])
+  }, [value, focused, contacts])
 
   useEffect(() => {
     function close(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setSuggestions([]) }
@@ -100,11 +92,7 @@ function RecipientField({ label, value, onChange, placeholder, trailing }) {
       {suggestions.length > 0 && (
         <div className="compose-autocomplete">
           {suggestions.map((c, i) => (
-            <div
-              key={i}
-              className="compose-autocomplete__item"
-              onMouseDown={() => pickContact(c)}
-            >
+            <div key={i} className="compose-autocomplete__item" onMouseDown={() => pickContact(c)}>
               <span className="compose-autocomplete__name">{c.display_name || c.email}</span>
               {c.display_name && c.email && (
                 <span className="compose-autocomplete__email">{c.email}</span>
@@ -117,17 +105,16 @@ function RecipientField({ label, value, onChange, placeholder, trailing }) {
   )
 }
 
-export default function ComposeWindow() {
-  const state = useAppState()
-  const dispatch = useAppDispatch()
-  const t = useTranslation()
-  const { mode, referencedMessage } = state.compose
-  const msg = referencedMessage
+export default function ComposeViewerApp({ composeData }) {
+  const { mode = 'new', message: msg, body, to: initialTo = '' } = composeData || {}
 
-  const [to, setTo] = useState('')
+  const [settings, setSettings] = useState({ theme: 'light', signature: '', language: 'en' })
+  const [contacts, setContacts] = useState([])
+  const [accountEmail, setAccountEmail] = useState('')
+  const [to, setTo] = useState(initialTo || (msg && mode !== 'new' ? buildReplyTo(mode, msg) : ''))
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
-  const [subject, setSubject] = useState('')
+  const [subject, setSubject] = useState(msg && mode !== 'new' ? buildReplySubject(mode, msg.subject) : '')
   const [showCcBcc, setShowCcBcc] = useState(mode === 'replyAll')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -136,13 +123,28 @@ export default function ComposeWindow() {
   const [draftId, setDraftId] = useState(null)
   const draftTimer = useRef(null)
 
+  useEffect(() => {
+    window.api.settings.get().then(r => {
+      if (r.ok) setSettings(r.settings)
+    })
+    window.api.auth.getCredentials().then(r => {
+      if (r.ok && r.creds) {
+        const email = r.creds.email
+        setAccountEmail(email)
+        window.api.contacts.list(email).then(res => {
+          if (res.ok) setContacts(res.contacts || [])
+        })
+      }
+    })
+  }, [])
+
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: t('compose.placeholder') }),
+      Placeholder.configure({ placeholder: 'Write your message…' }),
       Image.configure({ inline: true, allowBase64: true }),
     ],
     editorProps: {
@@ -173,22 +175,13 @@ export default function ComposeWindow() {
 
   useEffect(() => {
     if (!editor) return
-    const replyBody = buildReplyBody(mode, msg, msg?.body)
-    const sig = state.settings.signature
-      ? `<p></p><p>--</p><p>${state.settings.signature}</p>`
+    const replyBody = buildReplyBody(mode, msg, body || msg?.body)
+    const sig = settings.signature
+      ? `<p></p><p>--</p><p>${settings.signature}</p>`
       : '<p></p>'
     editor.commands.setContent(sig + (mode !== 'new' ? replyBody : ''))
     editor.commands.focus('start')
-  }, [editor, mode, msg])
-
-  useEffect(() => {
-    if (!msg) return
-    if (mode !== 'new') {
-      setTo(buildReplyTo(mode, msg))
-      setSubject(buildReplySubject(mode, msg.subject))
-      if (mode === 'replyAll') setShowCcBcc(true)
-    }
-  }, [mode, msg])
+  }, [editor, mode])
 
   async function handleAttachFiles() {
     const result = await window.api.dialog.pickFiles()
@@ -202,14 +195,14 @@ export default function ComposeWindow() {
   }
 
   useEffect(() => {
-    if (!state.auth.email) return
+    if (!accountEmail) return
     clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(async () => {
       const html = editor?.getHTML() || ''
       if (!to && !subject && html === '<p></p>') return
       const draft = {
         id: draftId || undefined,
-        account_email: state.auth.email,
+        account_email: accountEmail,
         subject,
         to_field: to,
         cc_field: cc,
@@ -223,11 +216,11 @@ export default function ComposeWindow() {
       if (result.ok && result.id && !draftId) setDraftId(result.id)
     }, 2000)
     return () => clearTimeout(draftTimer.current)
-  }, [to, cc, bcc, subject, attachments])
+  }, [to, cc, bcc, subject, attachments, accountEmail])
 
   async function handleSend() {
-    if (!to.trim()) { setError(t('compose.error.noRecipient')); return }
-    if (!subject.trim()) { setError(t('compose.error.noSubject')); return }
+    if (!to.trim()) { setError('compose.error.noRecipient'); return }
+    if (!subject.trim()) { setError('compose.error.noSubject'); return }
     setSending(true)
     setError(null)
 
@@ -236,18 +229,14 @@ export default function ComposeWindow() {
 
     const creds = await window.api.auth.getCredentials()
     if (!creds.ok || !creds.creds) {
-      setError(t('compose.error.noCredentials'))
+      setError('compose.error.noCredentials')
       setSending(false)
       return
     }
 
     const mailOptions = {
-      to,
-      cc: cc || undefined,
-      bcc: bcc || undefined,
-      subject,
-      html,
-      text,
+      to, cc: cc || undefined, bcc: bcc || undefined,
+      subject, html, text,
       fromName: creds.creds.email,
       inReplyTo: msg?.message_id || undefined,
       references: msg?.message_id || undefined,
@@ -256,20 +245,21 @@ export default function ComposeWindow() {
 
     const result = await window.api.smtp.send(creds.creds.email, creds.creds.password, mailOptions)
     if (result.ok) {
-      if (draftId) { window.api.drafts.delete(draftId); setDraftId(null) }
+      if (draftId) { window.api.drafts.delete(draftId) }
       setSent(true)
-      setTimeout(() => dispatch({ type: 'CLOSE_COMPOSE' }), 1200)
+      setTimeout(() => window.close(), 1200)
     } else {
-      setError(result.error || t('compose.error.failedSend'))
+      setError(result.error || 'compose.error.failedSend')
       setSending(false)
     }
   }
 
   async function handleSaveDraft() {
+    if (!accountEmail) return
     const html = editor?.getHTML() || ''
     const draft = {
       id: draftId || undefined,
-      account_email: state.auth.email,
+      account_email: accountEmail,
       subject,
       to_field: to,
       cc_field: cc,
@@ -279,14 +269,12 @@ export default function ComposeWindow() {
       message_refs: msg?.message_id || null,
       attachments
     }
-    const result = await window.api.drafts.save(draft)
-    if (result.ok && result.id && !draftId) setDraftId(result.id)
-    dispatch({ type: 'CLOSE_COMPOSE' })
+    await window.api.drafts.save(draft)
+    window.close()
   }
 
-  function handleClose() {
-    dispatch({ type: 'CLOSE_COMPOSE' })
-  }
+  const locale = locales[settings.language] || locales.en
+  const t = (key) => locale[key] ?? locales.en[key] ?? key
 
   const windowTitle = (() => {
     if (mode === 'new') return t('compose.title.new')
@@ -307,52 +295,36 @@ export default function ComposeWindow() {
     </button>
   )
 
+  const theme = settings.theme || 'light'
+
   return (
-    <div className="compose-overlay" onClick={e => e.target === e.currentTarget && handleClose()}>
-      <div className="compose-window">
-        {/* Header */}
+    <div className={`app-root theme-${theme} viewer-window`}>
+      {/* Drag region for the native titlebar overlay area */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 150, height: 32, WebkitAppRegion: 'drag', zIndex: 9999 }} />
+      <div className="compose-window compose-window--standalone">
         <div className="compose-window__header">
           <span className="compose-window__title truncate">{windowTitle}</span>
-          <button className="btn btn--icon" onClick={handleClose} title={t('action.close')}>
-            <IconClose size={16} />
-          </button>
         </div>
 
-        {/* Address fields */}
         <div className="compose-window__fields">
           <RecipientField
             label={t('compose.to')}
             value={to}
             onChange={setTo}
             placeholder="recipient@example.com"
+            contacts={contacts}
             trailing={
-              <button
-                className="compose-field__cc-toggle"
-                onClick={() => setShowCcBcc(v => !v)}
-                title={t('compose.ccBcc')}
-              >
+              <button className="compose-field__cc-toggle" onClick={() => setShowCcBcc(v => !v)} title={t('compose.ccBcc')}>
                 {t('compose.ccBcc')}
               </button>
             }
           />
-
           {showCcBcc && (
             <>
-              <RecipientField
-                label={t('compose.cc')}
-                value={cc}
-                onChange={setCc}
-                placeholder="cc@example.com"
-              />
-              <RecipientField
-                label={t('compose.bcc')}
-                value={bcc}
-                onChange={setBcc}
-                placeholder="bcc@example.com"
-              />
+              <RecipientField label={t('compose.cc')} value={cc} onChange={setCc} placeholder="cc@example.com" contacts={contacts} />
+              <RecipientField label={t('compose.bcc')} value={bcc} onChange={setBcc} placeholder="bcc@example.com" contacts={contacts} />
             </>
           )}
-
           <div className="compose-field">
             <span className="compose-field__label">{t('compose.subject')}</span>
             <input
@@ -364,91 +336,50 @@ export default function ComposeWindow() {
           </div>
         </div>
 
-        {/* Rich text toolbar */}
         <div className="compose-toolbar">
           <ToolBtn onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={editor?.isActive('bold')} title={t('compose.bold')}>
-            <IconBold size={15} />
-          </ToolBtn>
+            active={editor?.isActive('bold')} title={t('compose.bold')}><IconBold size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={editor?.isActive('italic')} title={t('compose.italic')}>
-            <IconItalic size={15} />
-          </ToolBtn>
+            active={editor?.isActive('italic')} title={t('compose.italic')}><IconItalic size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().toggleUnderline().run()}
-            active={editor?.isActive('underline')} title={t('compose.underline')}>
-            <IconUnderlineF size={15} />
-          </ToolBtn>
+            active={editor?.isActive('underline')} title={t('compose.underline')}><IconUnderlineF size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().toggleStrike().run()}
-            active={editor?.isActive('strike')} title={t('compose.strike')}>
-            <IconStrike size={15} />
-          </ToolBtn>
-
+            active={editor?.isActive('strike')} title={t('compose.strike')}><IconStrike size={15} /></ToolBtn>
           <div className="compose-toolbar__separator" />
-
           <ToolBtn onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={editor?.isActive('bulletList')} title={t('compose.bulletList')}>
-            <IconListBullet size={15} />
-          </ToolBtn>
+            active={editor?.isActive('bulletList')} title={t('compose.bulletList')}><IconListBullet size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-            active={editor?.isActive('orderedList')} title={t('compose.orderedList')}>
-            <IconListOrdered size={15} />
-          </ToolBtn>
-
+            active={editor?.isActive('orderedList')} title={t('compose.orderedList')}><IconListOrdered size={15} /></ToolBtn>
           <div className="compose-toolbar__separator" />
-
           <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('left').run()}
-            active={editor?.isActive({ textAlign: 'left' })} title={t('compose.alignLeft')}>
-            <IconAlignLeft size={15} />
-          </ToolBtn>
+            active={editor?.isActive({ textAlign: 'left' })} title={t('compose.alignLeft')}><IconAlignLeft size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('center').run()}
-            active={editor?.isActive({ textAlign: 'center' })} title={t('compose.alignCenter')}>
-            <IconAlignCenter size={15} />
-          </ToolBtn>
+            active={editor?.isActive({ textAlign: 'center' })} title={t('compose.alignCenter')}><IconAlignCenter size={15} /></ToolBtn>
           <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('right').run()}
-            active={editor?.isActive({ textAlign: 'right' })} title={t('compose.alignRight')}>
-            <IconAlignRight size={15} />
-          </ToolBtn>
-
+            active={editor?.isActive({ textAlign: 'right' })} title={t('compose.alignRight')}><IconAlignRight size={15} /></ToolBtn>
           <div className="compose-toolbar__separator" />
-
           <ToolBtn onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            active={editor?.isActive('blockquote')} title={t('compose.quote')}>
-            <IconQuote size={15} />
-          </ToolBtn>
-
+            active={editor?.isActive('blockquote')} title={t('compose.quote')}><IconQuote size={15} /></ToolBtn>
           <div className="compose-toolbar__separator" />
-
-          <ToolBtn onClick={handleAttachFiles} active={false} title={t('compose.attach')}>
-            <IconAttach size={15} />
-          </ToolBtn>
-
+          <ToolBtn onClick={handleAttachFiles} active={false} title={t('compose.attach')}><IconAttach size={15} /></ToolBtn>
           <div className="compose-toolbar__spacer" />
         </div>
 
-        {/* Editor */}
         <div className="compose-window__editor">
           <div className="tiptap-editor">
             {editor && <EditorContent editor={editor} />}
           </div>
         </div>
 
-        {/* Attachment list */}
         {attachments.length > 0 && (
           <div className="compose-attachments">
             {attachments.map((att, i) => (
               <div key={i} className="attachment-chip">
                 <span className="truncate" style={{ maxWidth: 140 }}>{att.name}</span>
                 <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                  {att.size > 1048576
-                    ? `${(att.size / 1048576).toFixed(1)} MB`
-                    : `${Math.round(att.size / 1024)} KB`}
+                  {att.size > 1048576 ? `${(att.size / 1048576).toFixed(1)} MB` : `${Math.round(att.size / 1024)} KB`}
                 </span>
-                <button
-                  className="btn btn--icon"
-                  style={{ width: 18, height: 18 }}
-                  onClick={() => removeAttachment(i)}
-                  title={t('action.close')}
-                >
+                <button className="btn btn--icon" style={{ width: 18, height: 18 }} onClick={() => removeAttachment(i)} title={t('action.close')}>
                   <IconClose size={10} />
                 </button>
               </div>
@@ -456,41 +387,19 @@ export default function ComposeWindow() {
           </div>
         )}
 
-        {/* Footer */}
         <div className="compose-window__footer">
           <div style={{ flex: 1 }}>
-            {error && (
-              <div className="setup-error" style={{ padding: 'var(--sp-2) var(--sp-3)' }}>{error}</div>
-            )}
-            {sent && (
-              <div style={{ color: 'var(--color-success)', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                {t('compose.sent')}
-              </div>
-            )}
+            {error && <div className="setup-error" style={{ padding: 'var(--sp-2) var(--sp-3)' }}>{t(error)}</div>}
+            {sent && <div style={{ color: 'var(--color-success)', fontSize: 'var(--text-sm)' }}>{t('compose.sent')}</div>}
           </div>
-
           <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
-            <button className="btn btn--ghost" onClick={handleSaveDraft}>
-              {t('compose.saveDraft')}
-            </button>
-            <button className="btn btn--ghost" onClick={handleClose}>
-              {t('compose.discard')}
-            </button>
-            <button
-              className="btn btn--primary"
-              onClick={handleSend}
-              disabled={sending || sent || !to.trim()}
-            >
+            <button className="btn btn--ghost" onClick={handleSaveDraft}>{t('compose.saveDraft')}</button>
+            <button className="btn btn--ghost" onClick={() => window.close()}>{t('compose.discard')}</button>
+            <button className="btn btn--primary" onClick={handleSend} disabled={sending || sent || !to.trim()}>
               {sending ? (
-                <>
-                  <span className="spinner" style={{ width: 14, height: 14 }} />
-                  {t('compose.sending')}
-                </>
+                <><span className="spinner" style={{ width: 14, height: 14 }} />{t('compose.sending')}</>
               ) : (
-                <>
-                  <IconSend size={14} />
-                  {t('compose.send')}
-                </>
+                <><IconSend size={14} />{t('compose.send')}</>
               )}
             </button>
           </div>

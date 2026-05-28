@@ -18,7 +18,13 @@
       "PowerShell($staged = git status --short; Write-Host \"Files staged: $\\($staged.Count\\)\"; $staged | Select-Object -Last 5)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
-      "PowerShell(git add README.md)"
+      "PowerShell(git add README.md)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\styles\\\\components.css\" | Measure-Object -Line\\).Lines)"
     ]
   }
 }

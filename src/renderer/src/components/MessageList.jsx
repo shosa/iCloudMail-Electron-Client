@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
-import { IconSearch, IconClose, IconAttach, IconEnvelope, IconStar } from './Icons'
+import { IconSearch, IconClose, IconAttach, IconEnvelope, IconStar, IconReply, IconTrash, IconMarkRead } from './Icons'
 import ContextMenu from './ContextMenu'
 
 const AVATAR_COLORS = [
@@ -19,10 +19,10 @@ function getAvatarColor(name) {
 function getInitials(name, email) {
   if (name) {
     const parts = name.trim().split(' ')
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
+    if (parts.length >= 2) return ([...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase()
+    return [...parts[0]].slice(0, 2).join('').toUpperCase()
   }
-  return (email || '?').slice(0, 2).toUpperCase()
+  return [...(email || '?')].slice(0, 2).join('').toUpperCase()
 }
 
 function formatDate(ts) {
@@ -190,13 +190,13 @@ export default function MessageList() {
 
     switch (type) {
       case 'reply':
-        dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'reply', message: msg } })
+        window.api.window.openCompose({ mode: 'reply', message: msg })
         break
       case 'replyAll':
-        dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'replyAll', message: msg } })
+        window.api.window.openCompose({ mode: 'replyAll', message: msg })
         break
       case 'forward':
-        dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'forward', message: msg } })
+        window.api.window.openCompose({ mode: 'forward', message: msg })
         break
 
       case 'markRead':
@@ -281,7 +281,7 @@ export default function MessageList() {
     <div className="message-list" onClick={e => { if (!e.defaultPrevented) setContextMenu(null) }}>
       <div className="message-list__header">
         <div className="message-list__title">
-          {state.messages.searchResults !== null ? `Search: "${localSearch}"` : folderName}
+          {state.messages.searchResults !== null ? `"${localSearch}"` : folderName}
           {' '}
           {!state.messages.searchResults && state.messages.total > 0 && (
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', fontWeight: 'var(--weight-regular)' }}>
@@ -344,7 +344,7 @@ export default function MessageList() {
         </div>
       ) : displayMessages.length === 0 ? (
         <div className="message-list__empty">
-          <div style={{ fontSize: 40, opacity: 0.2 }}>📭</div>
+          <div style={{ opacity: 0.2 }}><IconEnvelope size={44} /></div>
           <span style={{ color: 'var(--text-secondary)', fontWeight: 'var(--weight-medium)' }}>
             {localSearch ? t('messages.noResults') : t('messages.noMessages')}
           </span>
@@ -375,6 +375,7 @@ export default function MessageList() {
                     multiSelected={selectedKeys.has(msgKey(msg))}
                     threadCount={idx === 0 && isMulti ? threadMsgs.length : null}
                     isThreadChild={idx > 0}
+                    onQuickAction={(type) => handleContextAction(type, [msg])}
                     onThreadExpand={isMulti && idx === 0 ? () => setExpandedThreads(prev => {
                       const next = new Set(prev)
                       next.has(threadId) ? next.delete(threadId) : next.add(threadId)
@@ -427,7 +428,7 @@ export default function MessageList() {
   )
 }
 
-function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart }) {
+function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart, onQuickAction }) {
   const isUnread  = !message.flags?.includes('\\Seen')
   const isStarred = message.flags?.includes('\\Flagged')
   const initials  = getInitials(message.from_name, message.from_email)
@@ -457,26 +458,50 @@ function MessageItem({ message, selected, multiSelected, threadCount, isThreadCh
       <div className="message-item__content">
         <div className="message-item__row1">
           <span className="message-item__sender">
-            {message.from_name || message.from_email || '(Unknown)'}
+            {message.from_name || message.from_email || '?'}
           </span>
           {threadCount && (
             <span
               className="message-item__thread-count"
               onClick={e => { e.stopPropagation(); onThreadExpand?.() }}
-              title={`${threadCount} messages in thread`}
             >{threadCount}</span>
           )}
           {isStarred && !multiSelected && <IconStar size={12} style={{ color: '#ffd60a', fill: '#ffd60a', flexShrink: 0 }} />}
           <span className="message-item__time">{formatDate(message.date)}</span>
         </div>
         <div className="message-item__subject truncate">
-          {message.subject || '(No subject)'}
+          {message.subject || '—'}
         </div>
         <div className="message-item__preview">
           {message.has_attachments && <span className="message-item__attachments-icon"><IconAttach size={12} /></span>}
           <span className="truncate">{message.snippet}</span>
         </div>
       </div>
+
+      {onQuickAction && (
+        <div className="message-item__quick-actions" onClick={e => e.stopPropagation()}>
+          <button
+            className="message-item__quick-btn"
+            onClick={e => { e.stopPropagation(); onQuickAction('reply') }}
+            title="Reply"
+          ><IconReply size={13} /></button>
+          <button
+            className={`message-item__quick-btn${isStarred ? ' active' : ''}`}
+            onClick={e => { e.stopPropagation(); onQuickAction(isStarred ? 'unstar' : 'star') }}
+            title={isStarred ? 'Unstar' : 'Star'}
+          ><IconStar size={13} /></button>
+          <button
+            className="message-item__quick-btn"
+            onClick={e => { e.stopPropagation(); onQuickAction(isUnread ? 'markRead' : 'markUnread') }}
+            title={isUnread ? 'Mark read' : 'Mark unread'}
+          ><IconMarkRead size={13} /></button>
+          <button
+            className="message-item__quick-btn message-item__quick-btn--danger"
+            onClick={e => { e.stopPropagation(); onQuickAction('delete') }}
+            title="Delete"
+          ><IconTrash size={13} /></button>
+        </div>
+      )}
     </div>
   )
 }

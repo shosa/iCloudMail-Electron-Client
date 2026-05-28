@@ -8,7 +8,7 @@ import es from  '../locales/es.json'
 import ru from  '../locales/ru.json'
 import cn from '../locales/cn.json'
 
-const locales = { en, it, fr, de , jp, es , ru , cn}
+export const locales = { en, it, fr, de , jp, es , ru , cn}
 
 export function useTranslation() {
   let state

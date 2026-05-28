@@ -182,7 +182,7 @@ export default function Sidebar() {
     dispatch({ type: 'SELECT_FOLDER', payload: path })
   }
 
-  function openCompose()  { dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new' } }) }
+  function openCompose()  { window.api.window.openCompose({ mode: 'new' }) }
   function openSettings() { dispatch({ type: 'TOGGLE_SETTINGS' }) }
   function signOut() {
     window.api.auth.deleteCredentials()

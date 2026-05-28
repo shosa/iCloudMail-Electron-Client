@@ -3,6 +3,7 @@ import {
   IconReply, IconReplyAll, IconForward, IconStar, IconMarkRead,
   IconTrash, IconNoSymbol, IconClose, IconAttach
 } from './Icons'
+import { locales } from '../i18n/index'
 
 const AVATAR_COLORS = ['#0071e3','#5e5ebc','#bf5af2','#ff6b35','#30d158','#ffd60a','#ff453a','#64d2ff']
 
@@ -13,12 +14,37 @@ function getAvatarColor(name) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
+function AddressChip({ address, large }) {
+  const a = typeof address === 'string' ? { email: address, name: '' } : (address || {})
+  const email = a.email || ''
+  const color = getAvatarColor(a.name || email)
+  const ini = getInitials(a.name, email)
+  return (
+    <div
+      className={`address-chip${large ? ' address-chip--large' : ''}`}
+      title={email}
+      onClick={() => window.api.window.openCompose({ mode: 'new', to: email })}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && window.api.window.openCompose({ mode: 'new', to: email })}
+    >
+      <div className="address-chip__avatar" style={{ background: color }}>{ini}</div>
+      <span className="address-chip__name">{a.name || email}</span>
+      <div className="address-chip__popover">
+        {a.name && <div className="address-chip__popover-name">{a.name}</div>}
+        <div className="address-chip__popover-email">{email}</div>
+      </div>
+    </div>
+  )
+}
+
 function getInitials(name, email) {
   if (name) {
     const p = name.trim().split(' ')
-    return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase()
+    if (p.length >= 2) return ([...p[0]][0] + [...p[p.length - 1]][0]).toUpperCase()
+    return [...p[0]].slice(0, 2).join('').toUpperCase()
   }
-  return (email || '?').slice(0, 2).toUpperCase()
+  return [...(email || '?')].slice(0, 2).join('').toUpperCase()
 }
 
 function formatFullDate(ts) {
@@ -41,10 +67,11 @@ function buildSafeHTML(html, blockImages) {
 export default function MessageViewerApp({ message }) {
   const [body, setBody] = useState(null)
   const [bodyLoading, setBodyLoading] = useState(false)
-  const [settings, setSettings] = useState({ theme: 'light', blockRemoteImages: true })
+  const [settings, setSettings] = useState({ theme: 'light', blockRemoteImages: true, language: 'en' })
   const [flags, setFlags] = useState(message?.flags || [])
   const [imagesBlocked, setImagesBlocked] = useState(true)
   const [imagesLoadedByUser, setImagesLoadedByUser] = useState(false)
+  const [imagePreview, setImagePreview] = useState(null)
 
   useEffect(() => {
     window.api.settings.get().then(r => {
@@ -68,10 +95,11 @@ export default function MessageViewerApp({ message }) {
     return <div className={`app-root theme-light`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>No message data</div>
   }
 
+  const locale = locales[settings.language] || locales.en
+  const t = (key) => locale[key] ?? locales.en[key] ?? key
+
   const isRead    = flags.includes('\\Seen')
   const isStarred = flags.includes('\\Flagged')
-  const initials  = getInitials(message.from_name, message.from_email)
-  const color     = getAvatarColor(message.from_name || message.from_email)
   const attachments = body?.attachments || []
 
   const hasRemoteImages = !!(body?.html && /src=["']https?:\/\//i.test(body.html))
@@ -116,7 +144,25 @@ export default function MessageViewerApp({ message }) {
   }
 
   function openCompose(mode) {
-    window.api.window.openComposeInMain({ mode, message: { ...message, flags }, body })
+    window.api.window.openCompose({ mode, message: { ...message, flags }, body })
+  }
+
+  async function handleDownloadAttachment(att, idx) {
+    const partId = att.partId || String(idx + 1)
+    const isImage = att.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.filename || '')
+    try {
+      const result = await window.api.imap.downloadAttachment(
+        message.folder, message.uid, partId, att.filename, message.account_email || ''
+      )
+      if (result.ok) {
+        if (isImage) {
+          const src = 'file:///' + result.filePath.replace(/\\/g, '/')
+          setImagePreview({ src, filename: att.filename })
+        } else {
+          window.api.shell.openPath(result.filePath)
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   const theme = settings.theme || 'light'
@@ -126,14 +172,14 @@ export default function MessageViewerApp({ message }) {
       {/* Viewer header — sits below native titlebar overlay (32px) */}
       <div className="viewer__header">
         <div className="viewer__toolbar">
-          <button className="btn btn--ghost" onClick={() => openCompose('reply')} title="Reply">
-            <IconReply size={15} /> Reply
+          <button className="btn btn--ghost" onClick={() => openCompose('reply')} title={t('action.reply')}>
+            <IconReply size={15} /> {t('action.reply')}
           </button>
-          <button className="btn btn--ghost" onClick={() => openCompose('replyAll')} title="Reply All">
-            <IconReplyAll size={15} /> All
+          <button className="btn btn--ghost" onClick={() => openCompose('replyAll')} title={t('action.replyAll')}>
+            <IconReplyAll size={15} /> {t('action.all')}
           </button>
-          <button className="btn btn--ghost" onClick={() => openCompose('forward')} title="Forward">
-            <IconForward size={15} /> Forward
+          <button className="btn btn--ghost" onClick={() => openCompose('forward')} title={t('action.forward')}>
+            <IconForward size={15} /> {t('action.forward')}
           </button>
 
           <div style={{ flex: 1 }} />
@@ -141,44 +187,52 @@ export default function MessageViewerApp({ message }) {
           <button
             className={`btn btn--icon${isStarred ? ' active' : ''}`}
             onClick={handleToggleStar}
-            title={isStarred ? 'Unstar' : 'Star'}
+            title={isStarred ? t('action.unstar') : t('action.star')}
           ><IconStar size={16} /></button>
 
           <button
             className="btn btn--icon"
             onClick={handleToggleRead}
-            title={isRead ? 'Mark unread' : 'Mark read'}
+            title={isRead ? t('action.markUnread') : t('action.markRead')}
           ><IconMarkRead size={16} /></button>
 
           <button
             className="btn btn--icon"
             onClick={handleMarkJunk}
-            title="Mark as Junk"
+            title={t('action.markJunk')}
           ><IconNoSymbol size={16} /></button>
 
           <button
             className="btn btn--icon btn--danger"
             onClick={handleDelete}
-            title="Delete"
+            title={t('action.delete')}
           ><IconTrash size={16} /></button>
 
           <div style={{ width: 1, background: 'var(--glass-border)', height: 20, margin: '0 4px' }} />
 
-          <button className="btn btn--icon" onClick={() => window.close()} title="Close window">
+          <button className="btn btn--icon" onClick={() => window.close()} title={t('action.close')}>
             <IconClose size={16} />
           </button>
         </div>
 
-        <h2 className="viewer__subject">{message.subject || '(No subject)'}</h2>
+        <h2 className="viewer__subject">{message.subject || t('reading.noSubject')}</h2>
 
         <div className="viewer__meta">
-          <div className="viewer__meta-avatar" style={{ backgroundColor: color }}>{initials}</div>
           <div className="viewer__meta-info">
-            <div className="viewer__from">{message.from_name || message.from_email}</div>
-            {message.from_name && <div className="viewer__from-email">{message.from_email}</div>}
+            <div className="viewer__recipients">
+              <span className="viewer__recipients-label">{t('reading.from')}</span>
+              <div className="viewer__chips">
+                <AddressChip address={{ name: message.from_name, email: message.from_email }} large />
+              </div>
+            </div>
             {(message.to_addresses?.length > 0) && (
-              <div className="viewer__to">
-                To: {(message.to_addresses || []).map(a => a.name || a.email || a).join(', ')}
+              <div className="viewer__recipients">
+                <span className="viewer__recipients-label">{t('reading.to')}</span>
+                <div className="viewer__chips">
+                  {(message.to_addresses || []).map((a, i) => (
+                    <AddressChip key={i} address={a} />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -188,12 +242,12 @@ export default function MessageViewerApp({ message }) {
 
       {showBlockedBanner && (
         <div className="reading-pane__images-blocked">
-          <span>Remote images blocked</span>
+          <span>{t('reading.imagesBlocked')}</span>
           <button
             className="btn btn--ghost"
             onClick={() => { setImagesBlocked(false); setImagesLoadedByUser(true) }}
             style={{ padding: 'var(--sp-1) var(--sp-3)', fontSize: 'var(--text-sm)' }}
-          >Load Images</button>
+          >{t('action.loadImages')}</button>
         </div>
       )}
 
@@ -213,7 +267,7 @@ export default function MessageViewerApp({ message }) {
           <div className="reading-pane__plain-text">{body.text}</div>
         ) : !bodyLoading ? (
           <div style={{ padding: 'var(--sp-5)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-            No content
+            {t('reading.noContent')}
           </div>
         ) : null}
       </div>
@@ -223,13 +277,36 @@ export default function MessageViewerApp({ message }) {
           {attachments.map((att, i) => {
             const kb = att.size ? (att.size > 1048576 ? `${(att.size/1048576).toFixed(1)} MB` : `${Math.round(att.size/1024)} KB`) : ''
             return (
-              <div key={i} className="attachment-chip" title={att.filename}>
+              <div key={i} className="attachment-chip" title={att.filename}
+                onClick={() => handleDownloadAttachment(att, i)}
+                style={{ cursor: 'pointer' }}
+              >
                 <IconAttach size={14} />
                 <span className="truncate" style={{ maxWidth: 200 }}>{att.filename}</span>
                 {kb && <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{kb}</span>}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {imagePreview && (
+        <div
+          className="image-preview-overlay"
+          onClick={() => setImagePreview(null)}
+          aria-label={t('reading.imagePreview')}
+        >
+          <div className="image-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="image-preview-modal__header">
+              <span className="truncate" style={{ fontSize: 'var(--text-sm)' }}>{imagePreview.filename}</span>
+              <button className="btn btn--icon" onClick={() => setImagePreview(null)}>
+                <IconClose size={16} />
+              </button>
+            </div>
+            <div className="image-preview-modal__body">
+              <img src={imagePreview.src} alt={imagePreview.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          </div>
         </div>
       )}
     </div>

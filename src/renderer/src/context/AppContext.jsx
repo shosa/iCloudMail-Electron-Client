@@ -44,6 +44,19 @@ const initialState = {
     list: [],          // [{ email, display_name, is_default, ... }]
     activeEmail: null  // which account's folder tree is shown in sidebar
   },
+  view: 'mail',        // 'mail' | 'contacts' | 'calendar'
+  contacts: {
+    list: [],
+    loading: false,
+    searchQuery: '',
+    selected: null,
+    syncing: false
+  },
+  calendar: {
+    events: [],
+    loading: false,
+    syncing: false
+  },
   notifications: [],
   loading: { active: false, label: '' }
 }
@@ -206,6 +219,30 @@ function reducer(state, action) {
         }
       }
     }
+
+    // View switching
+    case 'SET_VIEW':
+      return { ...state, view: action.payload }
+
+    // Contacts
+    case 'SET_CONTACTS':
+      return { ...state, contacts: { ...state.contacts, list: action.payload, loading: false } }
+    case 'SET_CONTACTS_LOADING':
+      return { ...state, contacts: { ...state.contacts, loading: action.payload } }
+    case 'SET_CONTACTS_SYNCING':
+      return { ...state, contacts: { ...state.contacts, syncing: action.payload } }
+    case 'SET_CONTACTS_SEARCH':
+      return { ...state, contacts: { ...state.contacts, searchQuery: action.payload } }
+    case 'SELECT_CONTACT':
+      return { ...state, contacts: { ...state.contacts, selected: action.payload } }
+
+    // Calendar
+    case 'SET_CALENDAR_EVENTS':
+      return { ...state, calendar: { ...state.calendar, events: action.payload, loading: false } }
+    case 'SET_CALENDAR_LOADING':
+      return { ...state, calendar: { ...state.calendar, loading: action.payload } }
+    case 'SET_CALENDAR_SYNCING':
+      return { ...state, calendar: { ...state.calendar, syncing: action.payload } }
 
     default:
       return state

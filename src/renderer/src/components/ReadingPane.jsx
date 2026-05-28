@@ -22,10 +22,12 @@ function getAvatarColor(name) {
 function getInitials(name, email) {
   if (name) {
     const parts = name.trim().split(' ')
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
+    if (parts.length >= 2) {
+      return ([...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase()
+    }
+    return [...parts[0]].slice(0, 2).join('').toUpperCase()
   }
-  return (email || '?').slice(0, 2).toUpperCase()
+  return [...(email || '?')].slice(0, 2).join('').toUpperCase()
 }
 
 const ADDR_COLORS = [
@@ -115,13 +117,13 @@ export default function ReadingPane() {
   }, [msg?.uid, msg?.folder])
 
   function handleReply() {
-    dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'reply', message: { ...msg, body } } })
+    window.api.window.openCompose({ mode: 'reply', message: msg, body })
   }
   function handleReplyAll() {
-    dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'replyAll', message: { ...msg, body } } })
+    window.api.window.openCompose({ mode: 'replyAll', message: msg, body })
   }
   function handleForward() {
-    dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'forward', message: { ...msg, body } } })
+    window.api.window.openCompose({ mode: 'forward', message: msg, body })
   }
 
   function handleDelete() {
@@ -193,7 +195,7 @@ export default function ReadingPane() {
           <button
             className="btn btn--ghost"
             style={{ marginTop: 'var(--sp-4)' }}
-            onClick={() => dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new' } })}
+            onClick={() => window.api.window.openCompose({ mode: 'new' })}
           >
             {t('action.compose')}
           </button>
@@ -306,7 +308,7 @@ export default function ReadingPane() {
                 <AddressChip
                   address={{ name: msg.from_name, email: msg.from_email }}
                   large
-                  onCompose={em => dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })}
+                  onCompose={em => window.api.window.openCompose({ mode: 'new', to: em })}
                 />
               </div>
             </div>
@@ -315,9 +317,7 @@ export default function ReadingPane() {
                 <span className="reading-pane__recipients-label">{t('reading.to')}</span>
                 <div className="reading-pane__chips">
                   {(msg.to_addresses || []).map((a, i) => (
-                    <AddressChip key={i} address={a} onCompose={em => {
-                      dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })
-                    }} />
+                    <AddressChip key={i} address={a} onCompose={em => window.api.window.openCompose({ mode: 'new', to: em })} />
                   ))}
                 </div>
               </div>
@@ -327,9 +327,7 @@ export default function ReadingPane() {
                 <span className="reading-pane__recipients-label">{t('reading.cc')}</span>
                 <div className="reading-pane__chips">
                   {(msg.cc_addresses || []).map((a, i) => (
-                    <AddressChip key={i} address={a} onCompose={em => {
-                      dispatch({ type: 'OPEN_COMPOSE', payload: { mode: 'new', message: { to: em } } })
-                    }} />
+                    <AddressChip key={i} address={a} onCompose={em => window.api.window.openCompose({ mode: 'new', to: em })} />
                   ))}
                 </div>
               </div>

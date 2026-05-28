@@ -47,7 +47,7 @@ export default function SetupScreen() {
       <div className="setup-card">
         <div className="setup-card__logo">✉</div>
 
-        <h1 className="setup-card__title">iCloud Mail</h1>
+        <h1 className="setup-card__title">Kumo</h1>
         <p className="setup-card__subtitle">
           Sign in with your iCloud email address and an app-specific password.
           Your credentials are encrypted using Windows DPAPI.

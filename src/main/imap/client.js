@@ -1,6 +1,7 @@
 import { ImapFlow } from 'imapflow'
 import { EventEmitter } from 'events'
 import { simpleParser } from 'mailparser'
+import { logSync, logMail, logMove, logDelete, logInfo, logWarn, logErr } from '../logger.js'
 import {
   upsertMessage,
   upsertFolder,
@@ -11,6 +12,9 @@ import {
   saveMessageBody,
   getMessageBody,
   removeMessages,
+  getLocalUids,
+  updateMessageFlags,
+  toggleMessageFlag,
   getSyncState,
   upsertSyncState,
   upsertAttachmentMeta,
@@ -89,22 +93,26 @@ export class ImapClient extends EventEmitter {
     this.idleFolder = 'INBOX'
     this.syncTimer = null
     this._idleLock = null
+    this._syncInFlight = new Map()  // folder → Promise (dedup concurrent syncs)
+    this._lastSyncTime = new Map()  // folder → timestamp
   }
 
   // ── Connection ────────────────────────────────────────────────────────────
 
   async connect() {
+    logInfo(`Connessione IMAP per ${this.email}…`)
     this.emit('connection-status', 'connecting')
     this.client = makeClient(this.email, this.password)
 
     this.client.on('error', (err) => {
-      console.error('IMAP error:', err.message)
+      logErr(`IMAP error: ${err.message}`)
       this._scheduleReconnect()
     })
 
     await this.client.connect()
     this.connected = true
     this.reconnectDelay = 5000
+    logInfo(`IMAP connesso — ${this.email}`)
     this.emit('connection-status', 'connected')
 
     await this._syncFolders()
@@ -156,8 +164,26 @@ export class ImapClient extends EventEmitter {
         }
       })
 
-      this.idleClient.on('flags', async () => {
+      this.idleClient.on('expunge', () => {
+        // Debounce multiple rapid expunges into a single reconciliation sync
+        clearTimeout(this._expungeTimer)
+        this._expungeTimer = setTimeout(async () => {
+          await this._syncFolder(this.idleFolder, true).catch(console.error)
+        }, 800)
+      })
+
+      this.idleClient.on('flags', async (data) => {
         await this._syncFolderCounts(this.idleFolder).catch(console.error)
+        // Update specific message flags if the event carries uid/flags info
+        if (data?.uid) {
+          const flags = data.flags
+            ? (Array.isArray(data.flags) ? data.flags : [...(data.flags || [])])
+            : null
+          if (flags) {
+            updateMessageFlags(this.idleFolder, data.uid, flags)
+            this.emit('flags-updated', { folder: this.idleFolder, uid: data.uid, flags })
+          }
+        }
       })
 
       this.idleClient.on('error', (err) => {
@@ -189,6 +215,7 @@ export class ImapClient extends EventEmitter {
 
   async _fetchNewMessages(folder, prevCount, newCount) {
     if (!this.client) return
+    logMail(`IDLE: ${newCount - prevCount} nuovi messaggi in "${folder}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       const syncState = getSyncState(this.email, folder)
@@ -200,11 +227,13 @@ export class ImapClient extends EventEmitter {
       if (!uids?.length) return
 
       let maxUid = lastUid
+      let fetched = 0
       for await (const msg of this.client.fetch(uids, {
         envelope: true, flags: true, bodyStructure: true, size: true
       }, { uid: true })) {
         this._persistEnvelope(msg, folder)
         if (msg.uid > maxUid) maxUid = msg.uid
+        fetched++
 
         if (!msg.flags?.has('\\Seen')) {
           this.emit('new-mail', {
@@ -215,6 +244,7 @@ export class ImapClient extends EventEmitter {
           })
         }
       }
+      if (fetched) logMail(`IDLE: scaricate ${fetched} email da "${folder}"`)
       if (maxUid > lastUid) upsertSyncState(this.email, folder, maxUid, newCount)
     } finally {
       lock.release()
@@ -286,52 +316,76 @@ export class ImapClient extends EventEmitter {
 
   // ── Message fetching ──────────────────────────────────────────────────────
 
-  async _syncFolder(folder, background = false) {
+  _syncFolder(folder, background = false) {
+    if (!this.client) return Promise.resolve()
+    if (this._syncInFlight.has(folder)) return this._syncInFlight.get(folder)
+    const p = this._doSyncFolder(folder, background)
+    this._syncInFlight.set(folder, p)
+    p.finally(() => this._syncInFlight.delete(folder))
+    return p
+  }
+
+  async _doSyncFolder(folder, background = false) {
     if (!this.client) return
+    logSync(`Inizio sync cartella "${folder}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       const status = await this.client.status(folder, { messages: true, unseen: true })
       const total  = status.messages || 0
       const unseen = status.unseen  || 0
       updateFolderCounts(folder, unseen, total)
+      logSync(`"${folder}": ${total} email totali, ${unseen} non lette`)
 
-      if (total === 0) {
-        this.emit('sync-complete', { folder, newCount: 0 })
-        return
+      // Always fetch the full UID set from server — this is the source of truth
+      const serverUids   = total > 0 ? await this.client.search({ all: true }, { uid: true }) : []
+      const serverUidSet = new Set(serverUids)
+      const localUids    = getLocalUids(folder)
+      const localUidSet  = new Set(localUids)
+
+      // 1. Remove messages deleted from server (UID reconciliation)
+      const orphans = localUids.filter(uid => !serverUidSet.has(uid))
+      if (orphans.length) {
+        removeMessages(orphans, folder)
+        logDelete(`"${folder}": rimosse ${orphans.length} email eliminate dal server`)
       }
 
-      const syncState = getSyncState(this.email, folder)
-      const lastUid   = syncState?.last_uid || 0
-      let   newCount  = 0
-      let   maxUid    = lastUid
+      // 2. Fetch envelopes for messages not yet cached locally
+      const newUids  = serverUids.filter(uid => !localUidSet.has(uid))
+      // On cold start limit to most recent 200; afterwards fetch all new
+      const toFetch  = localUids.length === 0 ? newUids.slice(-200) : newUids
+      let   newCount = 0
+      let   maxUid   = serverUids.length > 0 ? serverUids[serverUids.length - 1] : 0
 
-      if (lastUid === 0) {
-        // Cold start: fetch envelopes of most recent 200 messages
-        const from  = Math.max(1, total - 199)
-        const range = `${from}:*`
-        for await (const msg of this.client.fetch(range, {
+      if (toFetch.length) {
+        logMail(`"${folder}": scarico ${toFetch.length} email nuove…`)
+        for await (const msg of this.client.fetch(toFetch, {
           envelope: true, flags: true, bodyStructure: true, size: true
         }, { uid: true })) {
           this._persistEnvelope(msg, folder)
-          if (msg.uid > maxUid) maxUid = msg.uid
           newCount++
         }
+        logMail(`"${folder}": scaricate ${newCount} email`)
       } else {
-        // Delta sync: only UIDs we haven't seen
-        const uids = await this.client.search({ uid: `${lastUid + 1}:*` }, { uid: true })
-        if (uids?.length) {
-          for await (const msg of this.client.fetch(uids, {
-            envelope: true, flags: true, bodyStructure: true, size: true
-          }, { uid: true })) {
-            this._persistEnvelope(msg, folder)
-            if (msg.uid > maxUid) maxUid = msg.uid
-            newCount++
-          }
+        logSync(`"${folder}": nessuna email nuova`)
+      }
+
+      // 3. Sync flags for existing messages — catches read/starred changes from other devices
+      //    Limit to most recent 200 to stay fast on large folders
+      const existingUids  = localUids.filter(uid => serverUidSet.has(uid))
+      const flagSyncBatch = existingUids.slice(-200)
+      if (flagSyncBatch.length) {
+        let flagUpdates = 0
+        for await (const msg of this.client.fetch(flagSyncBatch, { flags: true }, { uid: true })) {
+          updateMessageFlags(folder, msg.uid, [...(msg.flags || [])])
+          flagUpdates++
         }
+        logSync(`"${folder}": aggiornati flag su ${flagUpdates} email`)
       }
 
       if (maxUid > 0) upsertSyncState(this.email, folder, maxUid, total)
-      this.emit('sync-complete', { folder, newCount })
+      this._lastSyncTime.set(folder, Date.now())
+      logSync(`"${folder}": sync completato (nuove: ${newCount}, rimosse: ${orphans.length})`)
+      this.emit('sync-complete', { folder, newCount, removedCount: orphans.length })
     } finally {
       lock.release()
     }
@@ -401,9 +455,12 @@ export class ImapClient extends EventEmitter {
     const total = getMessageCount(folder)
     const cached = getMessages(folder, pageSize, offset)
 
-    // If cache is cold or we want fresh data, sync from server
+    // Sync only when cache is cold AND folder hasn't been synced in the last 30s
     if (cached.length < pageSize && offset === 0) {
-      await this._syncFolder(folder)
+      const lastSync = this._lastSyncTime.get(folder) || 0
+      if (Date.now() - lastSync > 30000) {
+        await this._syncFolder(folder)
+      }
     }
 
     const messages = getMessages(folder, pageSize, offset)
@@ -505,6 +562,7 @@ export class ImapClient extends EventEmitter {
       } else {
         await this.client.messageFlagsRemove([uid], [flag], { uid: true })
       }
+      toggleMessageFlag(folder, uid, flag, add)
     } finally {
       lock.release()
     }
@@ -514,6 +572,7 @@ export class ImapClient extends EventEmitter {
 
   async moveMessage(folder, uid, destination) {
     if (!this.client) throw new Error('Not connected')
+    logMove(`Sposto uid=${uid} da "${folder}" → "${destination}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       await this.client.messageMove([uid], destination, { uid: true })
@@ -530,6 +589,7 @@ export class ImapClient extends EventEmitter {
     const trashFolder = folders.find(f => f.special_use === '\\Trash')?.path || 'Deleted Messages'
 
     if (permanent || folder === trashFolder) {
+      logDelete(`Elimino definitivamente uid=${uid} da "${folder}"`)
       const lock = await this.client.getMailboxLock(folder)
       try {
         await this.client.messageFlagsAdd([uid], ['\\Deleted'], { uid: true })
@@ -539,6 +599,7 @@ export class ImapClient extends EventEmitter {
         lock.release()
       }
     } else {
+      logDelete(`Sposto uid=${uid} nel cestino "${trashFolder}"`)
       await this.moveMessage(folder, uid, trashFolder)
     }
   }
@@ -547,8 +608,10 @@ export class ImapClient extends EventEmitter {
     const folders = getFolders()
     if (isJunk) {
       const junkFolder = folders.find(f => f.special_use === '\\Junk')?.path || 'Junk'
+      logMove(`Segno come spam uid=${uid} → "${junkFolder}"`)
       await this.moveMessage(folder, uid, junkFolder)
     } else {
+      logMove(`Rimuovo spam uid=${uid} → INBOX`)
       await this.moveMessage(folder, uid, 'INBOX')
     }
   }
@@ -603,7 +666,11 @@ export class ImapClient extends EventEmitter {
     try {
       const uids = await this.client.search({ seen: false }, { uid: true })
       if (uids?.length) {
+        logMail(`Segno come lette ${uids.length} email in "${folder}"`)
         await this.client.messageFlagsAdd(uids, ['\\Seen'], { uid: true })
+        for (const uid of uids) toggleMessageFlag(folder, uid, '\\Seen', true)
+      } else {
+        logMail(`Nessuna email non letta in "${folder}"`)
       }
     } finally {
       lock.release()
@@ -616,8 +683,11 @@ export class ImapClient extends EventEmitter {
     try {
       const uids = await this.client.search({ all: true }, { uid: true })
       if (uids?.length) {
+        logDelete(`Svuoto "${folder}": elimino ${uids.length} email`)
         await this.client.messageFlagsAdd(uids, ['\\Deleted'], { uid: true })
         await this.client.messageDelete(uids, { uid: true })
+        removeMessages(uids, folder)
+        logDelete(`"${folder}" svuotato`)
       }
     } finally {
       lock.release()
@@ -626,6 +696,7 @@ export class ImapClient extends EventEmitter {
 
   async bulkSetFlag(folder, uids, flag, add) {
     if (!this.client) throw new Error('Not connected')
+    logMail(`Flag "${flag}" ${add ? '+' : '-'} su ${uids.length} email in "${folder}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       if (add) {
@@ -633,6 +704,7 @@ export class ImapClient extends EventEmitter {
       } else {
         await this.client.messageFlagsRemove(uids, [flag], { uid: true })
       }
+      for (const uid of uids) toggleMessageFlag(folder, uid, flag, add)
     } finally {
       lock.release()
     }
@@ -642,6 +714,7 @@ export class ImapClient extends EventEmitter {
     if (!this.client) throw new Error('Not connected')
     const folders = getFolders()
     const trashFolder = folders.find(f => f.special_use === '\\Trash')?.path || 'Deleted Messages'
+    logDelete(`Elimino ${uids.length} email da "${folder}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       if (folder === trashFolder) {
@@ -649,6 +722,7 @@ export class ImapClient extends EventEmitter {
         await this.client.messageDelete(uids, { uid: true })
       } else {
         await this.client.messageMove(uids, trashFolder, { uid: true })
+        logMove(`Spostate ${uids.length} email nel cestino "${trashFolder}"`)
       }
       removeMessages(uids, folder)
     } finally {
@@ -658,6 +732,7 @@ export class ImapClient extends EventEmitter {
 
   async bulkMove(folder, uids, destination) {
     if (!this.client) throw new Error('Not connected')
+    logMove(`Sposto ${uids.length} email da "${folder}" → "${destination}"`)
     const lock = await this.client.getMailboxLock(folder)
     try {
       await this.client.messageMove(uids, destination, { uid: true })

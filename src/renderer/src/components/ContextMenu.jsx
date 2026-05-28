@@ -18,6 +18,15 @@ function Item({ icon, label, onClick, danger, disabled }) {
   )
 }
 
+const FOLDER_LABEL_KEY = {
+  '\\Inbox':   'folder.inbox',
+  '\\Sent':    'folder.sent',
+  '\\Drafts':  'folder.drafts',
+  '\\Trash':   'folder.trash',
+  '\\Junk':    'folder.junk',
+  '\\Archive': 'folder.archive'
+}
+
 export default function ContextMenu({ x, y, messages = [], folders = [], onClose, onAction }) {
   const t = useTranslation()
   const menuRef = useRef(null)
@@ -126,7 +135,7 @@ export default function ContextMenu({ x, y, messages = [], folders = [], onClose
                   <Item
                     key={f.path}
                     icon={<IconFolder size={15} />}
-                    label={f.name || f.path.split('/').pop()}
+                    label={f.special_use && FOLDER_LABEL_KEY[f.special_use] ? t(FOLDER_LABEL_KEY[f.special_use]) : (f.name || f.path.split('/').pop())}
                     onClick={() => act('move', f.path)}
                   />
                 ))}
