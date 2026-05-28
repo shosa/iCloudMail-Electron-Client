@@ -261,14 +261,26 @@ export default function Sidebar() {
           ))}
         </div>
       )}
-      <div className="sidebar__folders" style={{ visibility: currentView === 'mail' ? 'visible' : 'hidden', pointerEvents: currentView === 'mail' ? '' : 'none' }}>
-        {state.folders.loading && state.folders.list.length === 0 && (
+      <div className="sidebar__folders">
+        {currentView !== 'mail' ? (
+          <>
+            <div className="sidebar__section-label">iCloud</div>
+            <div className="folder-item active" style={{ cursor: 'default' }}>
+              <span className="folder-item__icon">
+                {currentView === 'contacts' ? <IconContacts size={16} /> : <IconCalendar size={16} />}
+              </span>
+              <span className="folder-item__name">Principale</span>
+            </div>
+          </>
+        ) : null}
+
+        {currentView === 'mail' && state.folders.loading && state.folders.list.length === 0 && (
           <div style={{ padding: 'var(--sp-4)', textAlign: 'center' }}>
             <div className="spinner" style={{ margin: '0 auto' }} />
           </div>
         )}
 
-        {systemFolders.length > 0 && (
+        {currentView === 'mail' && systemFolders.length > 0 && (
           <>
             <div className="sidebar__section-label">{t('sidebar.mailboxes')}</div>
             {systemFolders.map(folder => (
@@ -288,7 +300,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {customFolders.length > 0 && (
+        {currentView === 'mail' && customFolders.length > 0 && (
           <>
             <div className="sidebar__section-label" style={{ marginTop: 'var(--sp-3)' }}>
               {t('sidebar.folders')}

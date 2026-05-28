@@ -162,5 +162,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "登录以访问 iCloud 邮件。您需要一个 Apple 的 App 专用密码，而非您的普通 Apple ID 密码。",
+  "setup.emailLabel": "iCloud 邮箱",
+  "setup.passwordLabel": "App 专用密码",
+  "setup.signIn": "登录",
+  "setup.connecting": "连接中…",
+  "setup.helpText": "还没有 App 专用密码？",
+  "setup.helpLink": "在 Apple 官网创建 →",
+  "setup.error.connection": "无法连接。请检查您的邮箱和密码。",
+  "setup.error.save": "连接成功，但无法保存凭据。请重试。"
 }

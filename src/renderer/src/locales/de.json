@@ -162,5 +162,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "Melde dich an, um auf deine iCloud-Mails zuzugreifen. Du benötigst ein App-spezifisches Passwort von Apple – nicht dein normales Apple-ID-Passwort.",
+  "setup.emailLabel": "iCloud-E-Mail",
+  "setup.passwordLabel": "App-spezifisches Passwort",
+  "setup.signIn": "Anmelden",
+  "setup.connecting": "Verbinde…",
+  "setup.helpText": "Kein App-spezifisches Passwort?",
+  "setup.helpLink": "Bei Apple erstellen →",
+  "setup.error.connection": "Verbindung fehlgeschlagen. Überprüfe E-Mail und Passwort.",
+  "setup.error.save": "Verbunden, aber Anmeldedaten konnten nicht gespeichert werden. Versuche es erneut."
 }

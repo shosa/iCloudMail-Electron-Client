@@ -46,10 +46,33 @@ function ContactRow({ contact, selected, onClick }) {
   )
 }
 
+function formatBirthday(val) {
+  if (!val) return null
+  // handles "2000-03-30" or "20000330"
+  const m = val.replace(/-/g, '').match(/^(\d{4})(\d{2})(\d{2})$/)
+  if (!m) return val
+  return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function SocialIcon({ type }) {
+  const label = type ? type.charAt(0).toUpperCase() + type.slice(1) : '?'
+  const colors = { facebook: '#1877f2', whatsapp: '#25d366', twitter: '#1da1f2', instagram: '#e1306c', linkedin: '#0a66c2' }
+  const bg = colors[type?.toLowerCase()] || 'var(--accent)'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: '50%', background: bg, color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+      {label[0]}
+    </span>
+  )
+}
+
 function ContactDetail({ contact, onClose, onCompose }) {
   const t = useTranslation()
+  const [photoOk, setPhotoOk] = useState(!!contact.photo_url)
   const bg = avatarColor(contact.display_name || contact.email)
   const ini = initials(contact.display_name, contact.email)
+  const birthday = formatBirthday(contact.birthday)
+  const socials = Array.isArray(contact.social_profiles) ? contact.social_profiles : []
+
   return (
     <div className="contact-detail">
       <div className="contact-detail__header">
@@ -58,7 +81,17 @@ function ContactDetail({ contact, onClose, onCompose }) {
         </button>
       </div>
       <div className="contact-detail__hero">
-        <div className="contact-detail__avatar" style={{ background: bg }}>{ini}</div>
+        {photoOk ? (
+          <img
+            src={contact.photo_url}
+            alt={contact.display_name}
+            className="contact-detail__avatar"
+            style={{ objectFit: 'cover' }}
+            onError={() => setPhotoOk(false)}
+          />
+        ) : (
+          <div className="contact-detail__avatar" style={{ background: bg }}>{ini}</div>
+        )}
         <div className="contact-detail__name">{contact.display_name || contact.email}</div>
         {contact.title && <div className="contact-detail__title">{contact.title}</div>}
         {contact.organization && <div className="contact-detail__org">{contact.organization}</div>}
@@ -76,6 +109,25 @@ function ContactDetail({ contact, onClose, onCompose }) {
             <span>{ph}</span>
           </div>
         ))}
+        {birthday && (
+          <div className="contact-detail__field">
+            <span style={{ fontSize: 14 }}>🎂</span>
+            <span>{birthday}</span>
+          </div>
+        )}
+        {socials.map((s, i) => {
+          const label = s.displayname || s.user || s.url || s.type
+          const url = s.url?.startsWith('http') ? s.url : null
+          return (
+            <div key={i} className="contact-detail__field">
+              <SocialIcon type={s.type} />
+              {url
+                ? <a href={url} onClick={e => { e.preventDefault(); window.api.shell.openExternal(url) }}>{label}</a>
+                : <span>{label}</span>
+              }
+            </div>
+          )
+        })}
         {contact.notes && (
           <div className="contact-detail__notes">{contact.notes}</div>
         )}

@@ -162,5 +162,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "Войдите, чтобы читать почту iCloud. Вам понадобится пароль для программы от Apple — не обычный пароль Apple ID.",
+  "setup.emailLabel": "Email iCloud",
+  "setup.passwordLabel": "Пароль для программы",
+  "setup.signIn": "Войти",
+  "setup.connecting": "Подключение…",
+  "setup.helpText": "Нет пароля для программы?",
+  "setup.helpLink": "Создать на Apple →",
+  "setup.error.connection": "Не удалось подключиться. Проверьте email и пароль.",
+  "setup.error.save": "Подключение успешно, но не удалось сохранить учётные данные. Попробуйте снова."
 }

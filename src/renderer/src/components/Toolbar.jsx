@@ -3,8 +3,7 @@ import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import {
   IconCompose, IconReply, IconReplyAll, IconForward,
-  IconTrash, IconArchive, IconMarkRead, IconNoSymbol,
-  IconSync, IconSearch
+  IconTrash, IconMarkRead, IconNoSymbol, IconSync
 } from './Icons'
 
 export default function Toolbar() {
@@ -13,6 +12,8 @@ export default function Toolbar() {
   const t = useTranslation()
   const msg = state.messages?.selected
   const view = state.view || 'mail'
+  const isMail = view === 'mail'
+  const mailDisabled = !isMail || !msg
 
   function handleNew() {
     window.api.window.openCompose({ mode: 'new' })
@@ -55,78 +56,45 @@ export default function Toolbar() {
     window.api.imap.markRead(msg.folder, msg.uid, !isRead)
   }
 
-  async function handleSyncContacts() {
+  async function handleSync() {
     const email = state.auth.email
     if (!email) return
-    dispatch({ type: 'SET_CONTACTS_SYNCING', payload: true })
-    try {
-      const credRes = await window.api.auth.getCredentials()
-      if (!credRes.ok || !credRes.creds) return
-      await window.api.contacts.sync(email, credRes.creds.password)
-      const listRes = await window.api.contacts.list(email)
-      if (listRes.ok) dispatch({ type: 'SET_CONTACTS', payload: listRes.contacts })
-    } catch { /* ignore */ }
-    dispatch({ type: 'SET_CONTACTS_SYNCING', payload: false })
-  }
-
-
-  async function handleSyncCalendar() {
-    const email = state.auth.email
-    if (!email) return
-    dispatch({ type: 'SET_CALENDAR_SYNCING', payload: true })
-    try {
-      const credRes = await window.api.auth.getCredentials()
-      if (!credRes.ok || !credRes.creds) return
-      await window.api.calendar.sync(email, credRes.creds.password)
-      const now = Date.now()
-      const evRes = await window.api.calendar.events(email, now - 30 * 86400000, now + 180 * 86400000)
-      if (evRes.ok) dispatch({ type: 'SET_CALENDAR_EVENTS', payload: evRes.events })
-    } catch { /* ignore */ }
-    dispatch({ type: 'SET_CALENDAR_SYNCING', payload: false })
+    if (view === 'contacts') {
+      dispatch({ type: 'SET_CONTACTS_SYNCING', payload: true })
+      try {
+        const credRes = await window.api.auth.getCredentials()
+        if (!credRes.ok || !credRes.creds) return
+        await window.api.contacts.sync(email, credRes.creds.password)
+        const listRes = await window.api.contacts.list(email)
+        if (listRes.ok) dispatch({ type: 'SET_CONTACTS', payload: listRes.contacts })
+      } catch { /* ignore */ }
+      dispatch({ type: 'SET_CONTACTS_SYNCING', payload: false })
+    } else if (view === 'calendar') {
+      dispatch({ type: 'SET_CALENDAR_SYNCING', payload: true })
+      try {
+        const credRes = await window.api.auth.getCredentials()
+        if (!credRes.ok || !credRes.creds) return
+        await window.api.calendar.sync(email, credRes.creds.password)
+        const now = Date.now()
+        const evRes = await window.api.calendar.events(email, now - 30 * 86400000, now + 180 * 86400000)
+        if (evRes.ok) dispatch({ type: 'SET_CALENDAR_EVENTS', payload: evRes.events })
+      } catch { /* ignore */ }
+      dispatch({ type: 'SET_CALENDAR_SYNCING', payload: false })
+    }
   }
 
   const isRead = msg?.flags?.includes('\\Seen')
-
-  if (view === 'contacts') {
-    return (
-      <div className="toolbar">
-        <div className="toolbar__group">
-          <button
-            className="toolbar__btn"
-            onClick={handleSyncContacts}
-            disabled={state.contacts.syncing}
-            title={t('toolbar.sync')}
-          >
-            <IconSync size={15} className={state.contacts.syncing ? 'spin' : ''} />
-            <span>{state.contacts.syncing ? t('toolbar.syncing') : t('toolbar.sync')}</span>
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (view === 'calendar') {
-    return (
-      <div className="toolbar">
-        <div className="toolbar__group">
-          <button
-            className="toolbar__btn"
-            onClick={handleSyncCalendar}
-            disabled={state.calendar.syncing}
-            title={t('toolbar.sync')}
-          >
-            <IconSync size={15} className={state.calendar.syncing ? 'spin' : ''} />
-            <span>{state.calendar.syncing ? t('toolbar.syncing') : t('toolbar.sync')}</span>
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const isSyncing = view === 'contacts' ? state.contacts?.syncing : state.calendar?.syncing
 
   return (
     <div className="toolbar">
       <div className="toolbar__group">
-        <button className="toolbar__btn toolbar__btn--primary toolbar__btn--circle" onClick={handleNew} title={t('toolbar.newMail')} aria-label={t('toolbar.newMail')}>
+        <button
+          className="toolbar__btn toolbar__btn--primary toolbar__btn--circle"
+          onClick={handleNew}
+          title={t('toolbar.newMail')}
+          aria-label={t('toolbar.newMail')}
+        >
           <IconCompose size={16} />
         </button>
       </div>
@@ -134,15 +102,15 @@ export default function Toolbar() {
       <div className="toolbar__separator" />
 
       <div className="toolbar__group">
-        <button className="toolbar__btn" onClick={handleReply} disabled={!msg} title={t('action.reply')}>
+        <button className="toolbar__btn" onClick={handleReply} disabled={mailDisabled} title={t('action.reply')}>
           <IconReply size={15} />
           <span>{t('action.reply')}</span>
         </button>
-        <button className="toolbar__btn" onClick={handleReplyAll} disabled={!msg} title={t('action.replyAll')}>
+        <button className="toolbar__btn" onClick={handleReplyAll} disabled={mailDisabled} title={t('action.replyAll')}>
           <IconReplyAll size={15} />
           <span>{t('action.all')}</span>
         </button>
-        <button className="toolbar__btn" onClick={handleForward} disabled={!msg} title={t('action.forward')}>
+        <button className="toolbar__btn" onClick={handleForward} disabled={mailDisabled} title={t('action.forward')}>
           <IconForward size={15} />
           <span>{t('action.forward')}</span>
         </button>
@@ -151,11 +119,16 @@ export default function Toolbar() {
       <div className="toolbar__separator" />
 
       <div className="toolbar__group">
-        <button className="toolbar__btn" onClick={handleToggleRead} disabled={!msg} title={isRead ? t('action.markUnread') : t('action.markRead')}>
+        <button
+          className="toolbar__btn"
+          onClick={handleToggleRead}
+          disabled={mailDisabled}
+          title={isRead ? t('action.markUnread') : t('action.markRead')}
+        >
           <IconMarkRead size={15} />
           <span>{isRead ? t('action.markUnread') : t('action.markRead')}</span>
         </button>
-        <button className="toolbar__btn" onClick={handleMarkJunk} disabled={!msg} title={t('action.markJunk')}>
+        <button className="toolbar__btn" onClick={handleMarkJunk} disabled={mailDisabled} title={t('action.markJunk')}>
           <IconNoSymbol size={15} />
           <span>{t('action.markJunk')}</span>
         </button>
@@ -164,11 +137,28 @@ export default function Toolbar() {
       <div className="toolbar__separator" />
 
       <div className="toolbar__group">
-        <button className="toolbar__btn toolbar__btn--danger" onClick={handleDelete} disabled={!msg} title={t('action.delete')}>
+        <button className="toolbar__btn toolbar__btn--danger" onClick={handleDelete} disabled={mailDisabled} title={t('action.delete')}>
           <IconTrash size={15} />
           <span>{t('action.delete')}</span>
         </button>
       </div>
+
+      {!isMail && (
+        <>
+          <div style={{ flex: 1 }} />
+          <div className="toolbar__group">
+            <button
+              className="toolbar__btn toolbar__btn--success toolbar__btn--circle"
+              onClick={handleSync}
+              disabled={isSyncing}
+              title={isSyncing ? t('toolbar.syncing') : t('toolbar.sync')}
+              aria-label={t('toolbar.sync')}
+            >
+              <IconSync size={15} className={isSyncing ? 'spin' : ''} />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

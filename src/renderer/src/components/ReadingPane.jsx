@@ -94,7 +94,8 @@ export default function ReadingPane() {
   const [attachmentMeta, setAttachmentMeta] = useState([])
   const [imagesBlocked, setImagesBlocked] = useState(state.settings.blockRemoteImages)
   const [imagesLoadedByUser, setImagesLoadedByUser] = useState(false)
-  const [imagePreview, setImagePreview] = useState(null)
+  const [filePreview, setFilePreview] = useState(null)   // { src, filename, isPdf, localPath }
+  const [loadingIdx, setLoadingIdx] = useState(null)
 
   useEffect(() => {
     if (!msg) { setBody(null); setAttachmentMeta([]); return }
@@ -158,28 +159,43 @@ export default function ReadingPane() {
     window.api.imap.markJunk(msg.folder, msg.uid, true)
   }
 
-  async function handleDownloadAttachment(att, idx) {
-    if (!msg) return
+  async function handlePreviewAttachment(att, idx) {
+    if (!msg || loadingIdx !== null) return
     const partId  = att.partId || String(idx + 1)
     const isImage = att.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.filename || '')
+    const isPdf   = att.type === 'application/pdf' || /\.pdf$/i.test(att.filename || '')
+    if (!isImage && !isPdf) {
+      // Non-previewable: save dialog
+      await handleSaveAttachment(att, idx)
+      return
+    }
+    setLoadingIdx(idx)
     try {
-      const result = await window.api.imap.downloadAttachment(
+      const dlResult = await window.api.imap.downloadAttachment(
         msg.folder, msg.uid, partId, att.filename, state.auth.email
       )
-      if (result.ok) {
-        if (isImage) {
-          // Normalize Windows backslashes → forward slashes for file:// URL
-          const src = 'file:///' + result.filePath.replace(/\\/g, '/')
-          setImagePreview({ src, filename: att.filename })
-        } else {
-          // shell.openPath handles Windows native paths correctly
-          window.api.shell.openPath(result.filePath)
-        }
-      } else {
-        console.error('Attachment download failed:', result.error)
+      if (!dlResult.ok) { console.error('Download failed:', dlResult.error); return }
+      const src = `kumo-local:///${dlResult.filePath.replace(/\\/g, '/')}`
+      setFilePreview({ src, filename: att.filename, isPdf, localPath: dlResult.filePath })
+    } catch (err) {
+      console.error('Preview error:', err.message)
+    } finally {
+      setLoadingIdx(null)
+    }
+  }
+
+  async function handleSaveAttachment(att, idx) {
+    if (!msg) return
+    const partId = att.partId || String(idx + 1)
+    try {
+      const dlResult = await window.api.imap.downloadAttachment(
+        msg.folder, msg.uid, partId, att.filename, state.auth.email
+      )
+      if (dlResult.ok) {
+        await window.api.dialog.saveFile(dlResult.filePath, att.filename)
       }
     } catch (err) {
-      console.error('Attachment download error:', err.message)
+      console.error('Save error:', err.message)
     }
   }
 
@@ -266,32 +282,40 @@ export default function ReadingPane() {
 
   return (
     <div className="reading-pane">
-      {imagePreview && (
+      {filePreview && (
         <div
           className="image-preview-overlay"
-          onClick={() => setImagePreview(null)}
-          onKeyDown={e => e.key === 'Escape' && setImagePreview(null)}
+          onClick={() => setFilePreview(null)}
+          onKeyDown={e => e.key === 'Escape' && setFilePreview(null)}
           role="dialog"
           aria-label={t('reading.imagePreview')}
         >
           <div className="image-preview-modal" onClick={e => e.stopPropagation()}>
             <div className="image-preview-modal__header">
-              <span className="truncate" style={{ fontSize: 'var(--text-sm)' }}>{imagePreview.filename}</span>
+              <span className="truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{filePreview.filename}</span>
               <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
                 <button
                   className="btn btn--ghost"
                   style={{ fontSize: 'var(--text-sm)' }}
-                  onClick={() => window.api.shell.openExternal(imagePreview.src)}
+                  onClick={() => window.api.dialog.saveFile(filePreview.localPath, filePreview.filename)}
                 >
                   <IconDownload size={14} />
                 </button>
-                <button className="btn btn--icon" onClick={() => setImagePreview(null)} title={t('action.close')}>
+                <button className="btn btn--icon" onClick={() => setFilePreview(null)} title={t('action.close')}>
                   <IconClose size={16} />
                 </button>
               </div>
             </div>
             <div className="image-preview-modal__body">
-              <img src={imagePreview.src} alt={imagePreview.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
+              {filePreview.isPdf ? (
+                <iframe
+                  src={filePreview.src}
+                  title={filePreview.filename}
+                  style={{ width: '100%', height: '100%', border: 'none', borderRadius: 'var(--radius-md)' }}
+                />
+              ) : (
+                <img src={filePreview.src} alt={filePreview.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
+              )}
             </div>
           </div>
         </div>
@@ -417,7 +441,9 @@ export default function ReadingPane() {
             <AttachmentChip
               key={i}
               attachment={att}
-              onDownload={() => handleDownloadAttachment(att, i)}
+              loading={loadingIdx === i}
+              onPreview={() => handlePreviewAttachment(att, i)}
+              onSave={() => handleSaveAttachment(att, i)}
             />
           ))}
         </div>
@@ -426,8 +452,10 @@ export default function ReadingPane() {
   )
 }
 
-function AttachmentChip({ attachment, onDownload }) {
+function AttachmentChip({ attachment, loading, onPreview, onSave }) {
   const isImage = attachment.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(attachment.filename || '')
+  const isPdf   = attachment.type === 'application/pdf' || /\.pdf$/i.test(attachment.filename || '')
+  const canPreview = isImage || isPdf
   const sizeStr = attachment.size
     ? attachment.size > 1048576
       ? `${(attachment.size / 1048576).toFixed(1)} MB`
@@ -435,20 +463,31 @@ function AttachmentChip({ attachment, onDownload }) {
     : ''
 
   return (
-    <div
-      className="attachment-chip attachment-chip--clickable"
-      onClick={onDownload}
-      title={attachment.filename}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onDownload()}
-    >
-      <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-        {isImage ? <IconFileImage size={16} /> : <IconFileDoc size={16} />}
-      </span>
-      <span className="truncate" style={{ maxWidth: 200 }}>{attachment.filename}</span>
-      {sizeStr && <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{sizeStr}</span>}
-      <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}><IconDownload size={13} /></span>
+    <div className={`attachment-chip${loading ? ' attachment-chip--loading' : ''}`}>
+      <div
+        className="attachment-chip__body"
+        onClick={loading ? undefined : onPreview}
+        title={canPreview ? attachment.filename : undefined}
+        role={canPreview ? 'button' : undefined}
+        tabIndex={canPreview ? 0 : undefined}
+        onKeyDown={e => !loading && canPreview && e.key === 'Enter' && onPreview()}
+        style={{ cursor: canPreview && !loading ? 'pointer' : 'default' }}
+      >
+        <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+          {loading ? <div className="spinner spinner--sm" /> : isImage ? <IconFileImage size={16} /> : <IconFileDoc size={16} />}
+        </span>
+        <span className="truncate" style={{ maxWidth: 180 }}>{attachment.filename}</span>
+        {sizeStr && <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{sizeStr}</span>}
+      </div>
+      <div className="attachment-chip__sep" />
+      <button
+        className="attachment-chip__dl-btn"
+        onClick={e => { e.stopPropagation(); onSave() }}
+        title="Salva file"
+        aria-label="Salva file"
+      >
+        <IconDownload size={13} />
+      </button>
     </div>
   )
 }

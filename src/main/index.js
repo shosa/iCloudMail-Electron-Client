@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, shell, dialog } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, shell, dialog, protocol } from 'electron'
+import { join, dirname, resolve, sep } from 'path'
 import {
   initDB, closeDB, searchMessages, getSettings, saveSetting,
   getFolders, clearBodyCache, clearFolderCache, getDbPath, resetAllData,
@@ -13,8 +13,15 @@ import {
 import { saveCredentials, getCredentials, deleteCredentials, listStoredEmails } from './auth/index.js'
 import { ImapClient } from './imap/client.js'
 import { sendEmail } from './smtp/index.js'
-import { syncContacts } from './carddav/client.js'
+import { syncContacts, dumpRawContacts } from './carddav/client.js'
 import { syncCalendar } from './caldav/client.js'
+import { logContact, logErr } from './logger.js'
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'kumo-local', privileges: { secure: true, stream: true, bypassCSP: true } }
+])
+
+app.setAppUserModelId('Kumo')
 
 let mainWindow = null
 let tray = null
@@ -28,6 +35,48 @@ function getResourcePath(filename) {
     return join(app.getAppPath(), 'resources', filename)
   }
   return join(process.resourcesPath, filename)
+}
+
+function _attachExternalLinkHandler(win) {
+  const isLocal = (url) => {
+    if (url.startsWith('file://')) return true
+    if (url.startsWith('kumo-local://')) return true
+    if (process.env.ELECTRON_RENDERER_URL && url.startsWith(process.env.ELECTRON_RENDERER_URL)) return true
+    return false
+  }
+
+  const openUrl = (url) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    } else if (url.startsWith('mailto:')) {
+      const to = decodeURIComponent(url.replace(/^mailto:/i, '').split('?')[0])
+      mainWindow?.webContents.send('open-compose', { mode: 'new', to })
+      mainWindow?.show()
+      mainWindow?.focus()
+    }
+  }
+
+  // Intercept target="_blank" / window.open() from renderer and iframes
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openUrl(url)
+    return { action: 'deny' }
+  })
+
+  // Intercept main-frame navigation (e.g. link without target navigating the whole window)
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isLocal(url)) {
+      event.preventDefault()
+      openUrl(url)
+    }
+  })
+
+  // Intercept iframe navigation (e.g. link clicked inside email body iframe)
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (!isLocal(event.url) && !event.isMainFrame) {
+      event.preventDefault()
+      openUrl(event.url)
+    }
+  })
 }
 
 function createWindow() {
@@ -60,6 +109,8 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  _attachExternalLinkHandler(mainWindow)
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
@@ -147,27 +198,60 @@ function updateTaskbarBadge(count) {
   if (!mainWindow) return
   if (count > 0) {
     try {
-      const size = 16
-      const canvas = Buffer.alloc(size * size * 4)
-      const cx = size / 2, cy = size / 2, r = size / 2 - 1
+      const size = 32
+      const buf = Buffer.alloc(size * size * 4)
+      const cx = size / 2 - 0.5, cy = size / 2 - 0.5, r = size / 2 - 1.5
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
           const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-          const idx = (y * size + x) * 4
-          if (dist <= r) {
-            canvas[idx]     = 255
-            canvas[idx + 1] = 69
-            canvas[idx + 2] = 58
-            canvas[idx + 3] = 255
+          const alpha = Math.max(0, Math.min(1, r + 1 - dist)) * 255
+          if (alpha > 0) {
+            const idx = (y * size + x) * 4
+            buf[idx] = 255; buf[idx + 1] = 59; buf[idx + 2] = 48
+            buf[idx + 3] = Math.round(alpha)
           }
         }
       }
-      const overlay = nativeImage.createFromBuffer(canvas, { width: size, height: size })
+      const overlay = nativeImage.createFromBuffer(buf, { width: size, height: size })
       mainWindow.setOverlayIcon(overlay, `${count} unread`)
     } catch { /* overlay icon not supported */ }
   } else {
     try { mainWindow.setOverlayIcon(null, '') } catch { /* ignore */ }
   }
+}
+
+function _makeAvatarIcon(from) {
+  const seed = from || '?'
+  let hash = 5381
+  for (let i = 0; i < seed.length; i++) hash = (hash * 33 ^ seed.charCodeAt(i)) & 0xffffffff
+  const h = (Math.abs(hash) % 360) / 360
+  const s = 0.60, l = 0.45
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  const hue2rgb = (t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  const r = Math.round(hue2rgb(h + 1 / 3) * 255)
+  const g = Math.round(hue2rgb(h) * 255)
+  const b = Math.round(hue2rgb(h - 1 / 3) * 255)
+  const size = 64
+  const buf = Buffer.alloc(size * size * 4)
+  const cx = size / 2 - 0.5, cy = size / 2 - 0.5, radius = size / 2 - 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      const alpha = Math.max(0, Math.min(1, radius + 1 - dist)) * 255
+      if (alpha > 0) {
+        const idx = (y * size + x) * 4
+        buf[idx] = r; buf[idx + 1] = g; buf[idx + 2] = b; buf[idx + 3] = Math.round(alpha)
+      }
+    }
+  }
+  return nativeImage.createFromBuffer(buf, { width: size, height: size })
 }
 
 function showNewMailNotification(subject, from, folder) {
@@ -180,9 +264,11 @@ function showNewMailNotification(subject, from, folder) {
 
   if (Notification.isSupported()) {
     try {
+      const icon = _makeAvatarIcon(from)
       const n = new Notification({
-        title: 'New Mail',
-        body: `From: ${from}\n${subject}`,
+        title: from || 'New Mail',
+        body: subject || '(no subject)',
+        icon,
         silent: false
       })
       n.on('click', () => {
@@ -535,7 +621,6 @@ ipcMain.handle('store:open-db-folder', async () => {
   try {
     const p = getDbPath()
     if (p) {
-      const { dirname } = await import('path')
       await shell.openPath(dirname(p))
     }
     return { ok: true }
@@ -546,6 +631,13 @@ ipcMain.handle('store:open-db-folder', async () => {
 
 ipcMain.handle('store:reset-all-data', async () => {
   try {
+    const entries = [...imapClients.entries()]
+    for (const [e, c] of entries) {
+      await c.disconnect().catch(() => {})
+      imapClients.delete(e)
+    }
+    unreadCounts.clear()
+    await deleteCredentials().catch(() => {})
     resetAllData()
     return { ok: true }
   } catch (err) {
@@ -557,6 +649,21 @@ ipcMain.handle('store:get-viewer-data', async (_e, id) => {
   const data = viewerDataStore.get(id)
   if (data) viewerDataStore.delete(id)
   return { ok: true, data: data || null }
+})
+
+ipcMain.handle('store:read-local-file', async (_e, filePath) => {
+  try {
+    const attDir = join(app.getPath('userData'), 'attachments')
+    const resolved = resolve(String(filePath))
+    if (!resolved.startsWith(attDir + sep) && resolved !== attDir) {
+      return { ok: false, error: 'Forbidden' }
+    }
+    const { readFileSync } = await import('fs')
+    const buf = readFileSync(resolved)
+    return { ok: true, base64: buf.toString('base64') }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 })
 
 // ── Settings IPC ──────────────────────────────────────────────────────────────
@@ -621,9 +728,21 @@ ipcMain.handle('drafts:delete', async (_e, id) => {
 ipcMain.handle('contacts:sync', async (_e, email, password) => {
   try {
     const contacts = await syncContacts(email, password)
-    for (const c of contacts) upsertContact({ ...c, account_email: email })
-    return { ok: true, count: contacts.length }
+    logContact(`[contacts:sync] trovati ${contacts.length} contatti, avvio upsert...`)
+    let saved = 0, failed = 0
+    for (const c of contacts) {
+      try {
+        upsertContact({ ...c, account_email: email })
+        saved++
+      } catch (err) {
+        failed++
+        if (failed <= 3) logErr(`[contacts:sync] upsert fallito per "${c.display_name}" (uid=${c.id}): ${err.message}`)
+      }
+    }
+    logContact(`[contacts:sync] completato: ${saved} salvati, ${failed} falliti`)
+    return { ok: true, count: saved }
   } catch (err) {
+    logErr(`[contacts:sync] errore generale: ${err.message}`)
     return { ok: false, error: err.message }
   }
 })
@@ -631,8 +750,10 @@ ipcMain.handle('contacts:sync', async (_e, email, password) => {
 ipcMain.handle('contacts:list', async (_e, email) => {
   try {
     const contacts = getContacts(email)
+    logContact(`[contacts:list] restituiti ${contacts.length} contatti per ${email}`)
     return { ok: true, contacts }
   } catch (err) {
+    logErr(`[contacts:list] errore: ${err.message}`)
     return { ok: false, error: err.message }
   }
 })
@@ -651,6 +772,31 @@ ipcMain.handle('contacts:clear', async (_e, email) => {
     deleteContacts(email)
     return { ok: true }
   } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('contacts:dump-raw', async (_e, email, password) => {
+  logContact(`[dump-raw] avvio per ${email}`)
+  try {
+    logContact('[dump-raw] chiamata dumpRawContacts...')
+    const raw = await dumpRawContacts(email, password)
+    logContact(`[dump-raw] ricevuti ${raw.length} caratteri, apro save dialog`)
+    const result = await dialog.showSaveDialog({
+      defaultPath: `carddav-raw-${Date.now()}.txt`,
+      filters: [{ name: 'Text files', extensions: ['txt'] }],
+      buttonLabel: 'Salva dump'
+    })
+    if (result.canceled || !result.filePath) {
+      logContact('[dump-raw] dialog annullato')
+      return { ok: false }
+    }
+    const { writeFileSync } = await import('fs')
+    writeFileSync(result.filePath, raw, 'utf8')
+    logContact(`[dump-raw] salvato in ${result.filePath}`)
+    return { ok: true, filePath: result.filePath }
+  } catch (err) {
+    logErr(`[dump-raw] errore: ${err.message}`)
     return { ok: false, error: err.message }
   }
 })
@@ -713,7 +859,7 @@ ipcMain.handle('window:open-message', async (_e, msg) => {
       backgroundColor: '#f5f5f7',
       titleBarStyle: 'hidden',
       titleBarOverlay: {
-        color: 'rgba(240,240,248,0)',
+        color: '#f5f5f7',
         symbolColor: '#333333',
         height: 32
       },
@@ -734,6 +880,7 @@ ipcMain.handle('window:open-message', async (_e, msg) => {
       })
     }
 
+    _attachExternalLinkHandler(viewerWindow)
     viewerWindow.once('ready-to-show', () => viewerWindow.show())
     return { ok: true }
   } catch (err) {
@@ -762,7 +909,7 @@ ipcMain.handle('window:open-compose', async (_e, data) => {
       backgroundColor: '#f5f5f7',
       titleBarStyle: 'hidden',
       titleBarOverlay: {
-        color: 'rgba(240,240,248,0)',
+        color: '#f5f5f7',
         symbolColor: '#333333',
         height: 32
       },
@@ -783,6 +930,7 @@ ipcMain.handle('window:open-compose', async (_e, data) => {
       })
     }
 
+    _attachExternalLinkHandler(composeWindow)
     composeWindow.once('ready-to-show', () => composeWindow.show())
     return { ok: true }
   } catch (err) {
@@ -799,6 +947,21 @@ ipcMain.handle('shell:open-path', (_e, filePath) => {
 })
 
 // ── Dialog ────────────────────────────────────────────────────────────────────
+
+ipcMain.handle('dialog:save-file', async (_e, sourcePath, filename) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: filename,
+    buttonLabel: 'Salva'
+  })
+  if (result.canceled || !result.filePath) return { ok: false }
+  try {
+    const { copyFileSync } = await import('fs')
+    copyFileSync(sourcePath, result.filePath)
+    return { ok: true, filePath: result.filePath }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
 
 ipcMain.handle('dialog:pick-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -821,12 +984,16 @@ ipcMain.handle('imap:download-attachment', async (_e, folder, uid, partId, filen
     const client = getClient(email)
     if (!client) return { ok: false, error: 'Not connected' }
 
-    const { join } = await import('path')
-    const { mkdirSync } = await import('fs')
+    const { mkdirSync, existsSync } = await import('fs')
     const attDir = join(app.getPath('userData'), 'attachments')
     mkdirSync(attDir, { recursive: true })
+    const safePartId = String(partId).replace(/[^0-9.]/g, '_')
     const safeName = filename.replace(/[^a-z0-9._-]/gi, '_')
-    const dest = join(attDir, `${uid}_${partId}_${safeName}`)
+    const dest = join(attDir, `${uid}_${safePartId}_${safeName}`)
+    if (!resolve(dest).startsWith(attDir + sep)) return { ok: false, error: 'Forbidden' }
+
+    // Return cached file immediately without hitting IMAP
+    if (existsSync(dest)) return { ok: true, filePath: dest }
 
     const { downloaded, filePath } = await client.downloadAttachment(folder, uid, partId, dest)
     if (downloaded) {
@@ -851,7 +1018,29 @@ ipcMain.handle('imap:get-attachment-meta', async (_e, uid, folder) => {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
+const KUMO_MIME = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  png: 'image/png', gif: 'image/gif',
+  webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp'
+}
+
 app.whenReady().then(async () => {
+  protocol.handle('kumo-local', async (request) => {
+    try {
+      let filePath = decodeURIComponent(new URL(request.url).pathname)
+      if (filePath.startsWith('/')) filePath = filePath.slice(1)
+      filePath = filePath.replace(/\//g, '\\')
+      const { readFile } = await import('fs/promises')
+      const data = await readFile(filePath)
+      const ext = (filePath.split('.').pop() || '').toLowerCase()
+      const mimeType = KUMO_MIME[ext] || 'application/octet-stream'
+      return new Response(data, { headers: { 'content-type': mimeType } })
+    } catch {
+      return new Response(null, { status: 404 })
+    }
+  })
+
   await initDB()
   createWindow()
   createTray()

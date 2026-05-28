@@ -24,7 +24,8 @@
       "Bash(Sort-Object)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\styles\\\\components.css\" | Measure-Object -Line\\).Lines)"
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\styles\\\\components.css\" | Measure-Object -Line\\).Lines)",
+      "Bash(Copy-Item \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\resources\\\\icon.png\" \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\assets\\\\icon.png\")"
     ]
   }
 }

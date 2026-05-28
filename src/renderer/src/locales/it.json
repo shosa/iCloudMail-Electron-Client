@@ -151,6 +151,8 @@
   "contacts.search": "Cerca contatti…",
   "contacts.empty": "Nessun contatto — clicca Sincronizza per importare",
   "contacts.selectContact": "Seleziona un contatto",
+  "contacts.clearAll": "Elimina contatti",
+  "calendar.today": "Oggi",
   "calendar.noEvents": "Nessun evento — clicca Sincronizza per importare",
   "calendar.noEventsDay": "Nessun evento in questo giorno",
   "calendar.selectEvent": "Seleziona un evento",
@@ -162,5 +164,14 @@
   "settings.clearContactsSuccess": "Contatti eliminati",
   "settings.clearCalendar": "Svuota Calendario",
   "settings.clearCalendarDesc": "Rimuovi tutti gli eventi del calendario dalla memoria locale",
-  "settings.clearCalendarSuccess": "Calendario eliminato"
+  "settings.clearCalendarSuccess": "Calendario eliminato",
+  "setup.subtitle": "Accedi per leggere la tua posta iCloud. Usa una password specifica per app di Apple, non la tua password Apple ID.",
+  "setup.emailLabel": "Email iCloud",
+  "setup.passwordLabel": "Password specifica per app",
+  "setup.signIn": "Accedi",
+  "setup.connecting": "Connessione…",
+  "setup.helpText": "Non hai una password specifica per app?",
+  "setup.helpLink": "Creane una su Apple →",
+  "setup.error.connection": "Connessione non riuscita. Controlla email e password.",
+  "setup.error.save": "Connesso ma impossibile salvare le credenziali. Riprova."
 }

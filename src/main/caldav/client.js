@@ -53,7 +53,7 @@ function unfold(raw) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
 
-function parseICalDate(val) {
+function parseICalDate(val, tzid) {
   if (!val) return null
   // Formats: 19970714T173000Z, 19970714, 19970714T173000
   const allDay = /^\d{8}$/.test(val)
@@ -67,6 +67,9 @@ function parseICalDate(val) {
   const m = val.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/)
   if (m) {
     const utc = m[7] === 'Z'
+    if (!utc && tzid) {
+      console.warn('[CAL] TZID not supported, treating as local time:', tzid)
+    }
     const d = new Date(
       parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]),
       parseInt(m[4]), parseInt(m[5]), parseInt(m[6])

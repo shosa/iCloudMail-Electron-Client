@@ -42,11 +42,13 @@ function buildReplySubject(mode, subject) {
   return subject.startsWith('Re:') ? subject : `Re: ${subject}`
 }
 
-function buildReplyTo(mode, msg) {
+function buildReplyTo(mode, msg, selfEmail) {
   if (mode === 'reply') return msg.from_email || ''
   if (mode === 'replyAll') {
     const all = [msg.from_email, ...(msg.to_addresses || []).map(a => a.email)].filter(Boolean)
-    return [...new Set(all)].join(', ')
+    return [...new Set(all)]
+      .filter(e => e.toLowerCase() !== (selfEmail || '').toLowerCase())
+      .join(', ')
   }
   return ''
 }
@@ -134,6 +136,7 @@ export default function ComposeWindow() {
   const [sent, setSent] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [draftId, setDraftId] = useState(null)
+  const [bodyVersion, setBodyVersion] = useState(0)
   const draftTimer = useRef(null)
 
   const editor = useEditor({
@@ -145,6 +148,7 @@ export default function ComposeWindow() {
       Placeholder.configure({ placeholder: t('compose.placeholder') }),
       Image.configure({ inline: true, allowBase64: true }),
     ],
+    onUpdate: () => setBodyVersion(v => v + 1),
     editorProps: {
       handlePaste(view, event) {
         const items = event.clipboardData?.items || []
@@ -184,7 +188,7 @@ export default function ComposeWindow() {
   useEffect(() => {
     if (!msg) return
     if (mode !== 'new') {
-      setTo(buildReplyTo(mode, msg))
+      setTo(buildReplyTo(mode, msg, state.auth.email))
       setSubject(buildReplySubject(mode, msg.subject))
       if (mode === 'replyAll') setShowCcBcc(true)
     }
@@ -223,7 +227,7 @@ export default function ComposeWindow() {
       if (result.ok && result.id && !draftId) setDraftId(result.id)
     }, 2000)
     return () => clearTimeout(draftTimer.current)
-  }, [to, cc, bcc, subject, attachments])
+  }, [to, cc, bcc, subject, attachments, bodyVersion])
 
   async function handleSend() {
     if (!to.trim()) { setError(t('compose.error.noRecipient')); return }
@@ -241,6 +245,10 @@ export default function ComposeWindow() {
       return
     }
 
+    const accRes = await window.api.accounts.list()
+    const account = accRes.ok ? accRes.accounts.find(a => a.email === creds.creds.email) : null
+    const fromName = account?.display_name || creds.creds.email
+
     const mailOptions = {
       to,
       cc: cc || undefined,
@@ -248,7 +256,7 @@ export default function ComposeWindow() {
       subject,
       html,
       text,
-      fromName: creds.creds.email,
+      fromName,
       inReplyTo: msg?.message_id || undefined,
       references: msg?.message_id || undefined,
       attachments: attachments.map(a => ({ filename: a.name, path: a.path }))

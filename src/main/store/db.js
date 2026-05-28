@@ -118,6 +118,12 @@ export async function initDB() {
     console.error('DB migration v2 error (non-fatal):', err.message)
   }
 
+  try {
+    _migrate3(db)
+  } catch (err) {
+    console.error('DB migration v3 error (non-fatal):', err.message)
+  }
+
   persistDB()
   return db
 }
@@ -272,9 +278,6 @@ function _runMigrations(d) {
 
   // Mark migration as complete
   d.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('schemaVersion', '1')`)
-
-  // ── Migration to version 2 ────────────────────────────────────────────────
-  _migrate2(d)
 }
 
 function _migrate2(d) {
@@ -337,12 +340,28 @@ function _migrate2(d) {
   d.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('schemaVersion', '2')`)
 }
 
+function _migrate3(d) {
+  let ver = 0
+  try {
+    const s = d.prepare(`SELECT value FROM settings WHERE key = 'schemaVersion'`)
+    if (s.step()) ver = parseInt(JSON.parse(s.getAsObject().value), 10) || 0
+    s.free()
+  } catch { /* ignore */ }
+  if (ver >= 3) return
+
+  try { d.run(`ALTER TABLE contacts ADD COLUMN birthday TEXT`) } catch { /* already exists */ }
+  try { d.run(`ALTER TABLE contacts ADD COLUMN photo_url TEXT`) } catch { /* already exists */ }
+  try { d.run(`ALTER TABLE contacts ADD COLUMN social_profiles TEXT DEFAULT '[]'`) } catch { /* already exists */ }
+
+  d.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('schemaVersion', '3')`)
+}
+
 function getDB() {
   if (!db) throw new Error('DB not initialized — call initDB() first')
   return db
 }
 
-function allRows(stmt, params = []) {
+function allRows(stmt) {
   const rows = []
   while (stmt.step()) {
     rows.push(stmt.getAsObject())
@@ -351,7 +370,7 @@ function allRows(stmt, params = []) {
   return rows
 }
 
-function oneRow(stmt, params = []) {
+function oneRow(stmt) {
   let row = null
   if (stmt.step()) row = stmt.getAsObject()
   stmt.free()
@@ -601,6 +620,13 @@ export function resetAllData() {
   d.run(`DELETE FROM messages`)
   d.run(`DELETE FROM folders`)
   d.run(`DELETE FROM settings`)
+  d.run(`DELETE FROM accounts`)
+  d.run(`DELETE FROM sync_state`)
+  d.run(`DELETE FROM drafts`)
+  d.run(`DELETE FROM attachments`)
+  d.run(`DELETE FROM contacts`)
+  d.run(`DELETE FROM calendar_events`)
+  try { d.run(`DELETE FROM messages_fts`) } catch { /* FTS5 best-effort */ }
   scheduleSave()
 }
 
@@ -671,8 +697,14 @@ export function getAccounts() {
 
 export function deleteAccount(email) {
   const d = getDB()
-  d.run(`DELETE FROM accounts WHERE email = ?`, [email])
+  try { d.run(`DELETE FROM messages_fts WHERE folder IN (SELECT DISTINCT folder FROM messages WHERE account_email = ?)`, [email]) } catch { /* FTS5 best-effort */ }
+  d.run(`DELETE FROM messages WHERE account_email = ?`, [email])
+  d.run(`DELETE FROM attachments WHERE uid NOT IN (SELECT uid FROM messages)`)
+  d.run(`DELETE FROM contacts WHERE account_email = ?`, [email])
+  d.run(`DELETE FROM calendar_events WHERE account_email = ?`, [email])
+  d.run(`DELETE FROM drafts WHERE account_email = ?`, [email])
   d.run(`DELETE FROM sync_state WHERE account_email = ?`, [email])
+  d.run(`DELETE FROM accounts WHERE email = ?`, [email])
   scheduleSave()
 }
 
@@ -801,34 +833,49 @@ export function upsertContact(contact) {
   d.run(`
     INSERT INTO contacts
       (id, account_email, display_name, first_name, last_name, email, emails,
-       phone, phones, organization, title, notes, etag, href, vcard, source, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       phone, phones, organization, title, notes, birthday, photo_url, social_profiles,
+       etag, href, vcard, source, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET
-      display_name  = excluded.display_name,
-      first_name    = excluded.first_name,
-      last_name     = excluded.last_name,
-      email         = excluded.email,
-      emails        = excluded.emails,
-      phone         = excluded.phone,
-      phones        = excluded.phones,
-      organization  = excluded.organization,
-      title         = excluded.title,
-      notes         = excluded.notes,
-      etag          = excluded.etag,
-      href          = excluded.href,
-      vcard         = excluded.vcard,
-      source        = excluded.source,
-      updated_at    = excluded.updated_at
+      display_name    = excluded.display_name,
+      first_name      = excluded.first_name,
+      last_name       = excluded.last_name,
+      email           = excluded.email,
+      emails          = excluded.emails,
+      phone           = excluded.phone,
+      phones          = excluded.phones,
+      organization    = excluded.organization,
+      title           = excluded.title,
+      notes           = excluded.notes,
+      birthday        = excluded.birthday,
+      photo_url       = excluded.photo_url,
+      social_profiles = excluded.social_profiles,
+      etag            = excluded.etag,
+      href            = excluded.href,
+      vcard           = excluded.vcard,
+      source          = excluded.source,
+      updated_at      = excluded.updated_at
   `, [
     contact.id, contact.account_email || null,
     contact.display_name || '', contact.first_name || '', contact.last_name || '',
     contact.email || '', JSON.stringify(contact.emails || []),
     contact.phone || '', JSON.stringify(contact.phones || []),
     contact.organization || null, contact.title || null, contact.notes || null,
+    contact.birthday || null, contact.photo_url || null,
+    JSON.stringify(contact.social_profiles || []),
     contact.etag || null, contact.href || null, contact.vcard || null,
     contact.source || 'carddav', Date.now()
   ])
   scheduleSave()
+}
+
+function _hydrateContact(r) {
+  return {
+    ...r,
+    emails:          JSON.parse(r.emails          || '[]'),
+    phones:          JSON.parse(r.phones          || '[]'),
+    social_profiles: JSON.parse(r.social_profiles || '[]'),
+  }
 }
 
 export function getContacts(accountEmail) {
@@ -838,7 +885,7 @@ export function getContacts(accountEmail) {
     : d.prepare(`SELECT * FROM contacts ORDER BY display_name ASC`)
   if (accountEmail) stmt.bind([accountEmail])
   const rows = allRows(stmt)
-  return rows.map(r => ({ ...r, emails: JSON.parse(r.emails || '[]'), phones: JSON.parse(r.phones || '[]') }))
+  return rows.map(r => _hydrateContact(r))
 }
 
 export function searchContacts(query, accountEmail) {
@@ -854,7 +901,7 @@ export function searchContacts(query, accountEmail) {
   const params = accountEmail ? [q, q, q, accountEmail] : [q, q, q]
   stmt.bind(params)
   const rows = allRows(stmt)
-  return rows.map(r => ({ ...r, emails: JSON.parse(r.emails || '[]'), phones: JSON.parse(r.phones || '[]') }))
+  return rows.map(r => _hydrateContact(r))
 }
 
 export function deleteContacts(accountEmail) {

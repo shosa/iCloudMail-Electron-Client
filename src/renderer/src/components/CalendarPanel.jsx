@@ -96,8 +96,8 @@ function EventCard({ event, onClick, selected }) {
             <IconClock size={11} /> {time}
           </div>
         )}
-        {event.all_day && (
-          <div className="event-card__time">{event.all_day ? 'All day' : ''}</div>
+        {!!event.all_day && (
+          <div className="event-card__time">All day</div>
         )}
       </div>
     </div>

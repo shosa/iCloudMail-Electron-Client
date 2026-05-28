@@ -162,5 +162,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "Connectez-vous pour accéder à iCloud Mail. Vous aurez besoin d'un mot de passe spécifique à l'app Apple — pas votre mot de passe Apple ID habituel.",
+  "setup.emailLabel": "Adresse iCloud",
+  "setup.passwordLabel": "Mot de passe spécifique",
+  "setup.signIn": "Se connecter",
+  "setup.connecting": "Connexion…",
+  "setup.helpText": "Pas encore de mot de passe spécifique ?",
+  "setup.helpLink": "En créer un chez Apple →",
+  "setup.error.connection": "Connexion impossible. Vérifiez votre adresse et votre mot de passe.",
+  "setup.error.save": "Connecté mais impossible de sauvegarder les identifiants. Réessayez."
 }

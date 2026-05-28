@@ -66,20 +66,32 @@ function unfoldVCard(raw) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
 
+function _parseParams(propPart) {
+  const segments = propPart.split(';')
+  const params = {}
+  for (let i = 1; i < segments.length; i++) {
+    const eqIdx = segments[i].indexOf('=')
+    if (eqIdx < 0) continue
+    params[segments[i].slice(0, eqIdx).toLowerCase()] = segments[i].slice(eqIdx + 1)
+  }
+  return params
+}
+
 export function parseVCard(raw) {
-  // Decode any XML entities (&#13; → \r, &apos; → ', etc.) then strip bare \r
   const cleaned = decodeXmlEntities(raw).replace(/\r/g, '')
   const lines = unfoldVCard(cleaned).split('\n')
-  const result = { emails: [], phones: [] }
+  const result = { emails: [], phones: [], social_profiles: [] }
 
   for (const line of lines) {
     const colonIdx = line.indexOf(':')
     if (colonIdx < 0) continue
-    const prop = line.slice(0, colonIdx).toUpperCase()
+    // Strip vCard group prefix (e.g. "item1.TEL;type=pref" → "TEL;type=pref")
+    const rawProp = line.slice(0, colonIdx).replace(/^[^.]+\./i, '')
+    const prop = rawProp.toUpperCase()
     const val  = line.slice(colonIdx + 1).trim()
 
-    if (prop === 'UID')    result.uid = val
-    else if (prop === 'FN')   result.display_name = val
+    if (prop === 'UID')                result.uid = val
+    else if (prop === 'FN')            result.display_name = val
     else if (prop === 'N') {
       const parts = val.split(';')
       result.last_name  = (parts[0] || '').trim()
@@ -90,6 +102,18 @@ export function parseVCard(raw) {
     else if (prop.startsWith('ORG'))   result.organization = val.split(';')[0].trim()
     else if (prop === 'TITLE')         result.title = val
     else if (prop === 'NOTE')          result.notes = val.replace(/\\n/g, '\n')
+    else if (prop.startsWith('BDAY'))  result.birthday = val
+    else if (prop.startsWith('ADR'))   result.address = (result.address || '') + val.replace(/;+/g, ', ').replace(/^[, ]+|[, ]+$/g, '')
+    else if (prop.startsWith('X-SOCIALPROFILE')) {
+      const params = _parseParams(rawProp)
+      const type = (params.type || '').toLowerCase()
+      const user = params['x-user'] || params['x-displayname'] || ''
+      const displayname = params['x-displayname'] || user
+      result.social_profiles.push({ type, user, displayname, url: val })
+    }
+    else if (prop.startsWith('PHOTO') && rawProp.toLowerCase().includes('value=uri') && val.startsWith('http')) {
+      result.photo_url = val
+    }
   }
 
   result.email = result.emails[0] || ''
@@ -216,7 +240,7 @@ function _parseVCardResponses(xmlBody, baseUrl) {
     const vcard = extractXmlProp(r, 'address-data') || ''
     if (!vcard) continue
     const parsed = parseVCard(vcard)
-    if (!parsed.uid && !parsed.email) continue
+    if (!parsed.uid && !parsed.email && !parsed.phone) continue
     const fullHref = href.startsWith('http') ? href : new URL(href, baseUrl).href
     contacts.push({
       id: parsed.uid || href,
@@ -315,6 +339,27 @@ ${hrefXml}
   const contacts = _parseVCardResponses(res.body, abUrl)
   logContact(`Strategia 3 (multiget): trovati ${contacts.length} contatti`)
   return contacts
+}
+
+export async function dumpRawContacts(email, password) {
+  const auth = { user: email, pass: password }
+  const addressBooks = await discoverAddressBook(email, password)
+  const sections = []
+
+  for (const ab of addressBooks) {
+    const queryBody = `<?xml version="1.0" encoding="UTF-8"?>
+<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
+  <D:prop><D:getetag/><C:address-data/></D:prop>
+  <C:filter><C:prop-filter name="FN"/></C:filter>
+</C:addressbook-query>`
+    const res = await followRedirects(ab.href, 'REPORT', auth, queryBody, {
+      'Depth': '1',
+      'Content-Type': 'application/xml; charset=utf-8'
+    })
+    sections.push(`=== ADDRESS BOOK: ${ab.name} (${ab.href}) ===\n\nHTTP ${res.status}\n\n${res.body}`)
+  }
+
+  return sections.join('\n\n' + '='.repeat(80) + '\n\n')
 }
 
 export async function syncContacts(email, password) {

@@ -36,11 +36,13 @@ function buildReplySubject(mode, subject) {
   return subject.startsWith('Re:') ? subject : `Re: ${subject}`
 }
 
-function buildReplyTo(mode, msg) {
+function buildReplyTo(mode, msg, selfEmail) {
   if (mode === 'reply') return msg.from_email || ''
   if (mode === 'replyAll') {
     const all = [msg.from_email, ...(msg.to_addresses || []).map(a => a.email)].filter(Boolean)
-    return [...new Set(all)].join(', ')
+    return [...new Set(all)]
+      .filter(e => e.toLowerCase() !== (selfEmail || '').toLowerCase())
+      .join(', ')
   }
   return ''
 }
@@ -111,7 +113,7 @@ export default function ComposeViewerApp({ composeData }) {
   const [settings, setSettings] = useState({ theme: 'light', signature: '', language: 'en' })
   const [contacts, setContacts] = useState([])
   const [accountEmail, setAccountEmail] = useState('')
-  const [to, setTo] = useState(initialTo || (msg && mode !== 'new' ? buildReplyTo(mode, msg) : ''))
+  const [to, setTo] = useState(initialTo || (msg && mode !== 'new' ? buildReplyTo(mode, msg, '') : ''))
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
   const [subject, setSubject] = useState(msg && mode !== 'new' ? buildReplySubject(mode, msg.subject) : '')
@@ -121,6 +123,7 @@ export default function ComposeViewerApp({ composeData }) {
   const [sent, setSent] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [draftId, setDraftId] = useState(null)
+  const [bodyVersion, setBodyVersion] = useState(0)
   const draftTimer = useRef(null)
 
   useEffect(() => {
@@ -131,6 +134,7 @@ export default function ComposeViewerApp({ composeData }) {
       if (r.ok && r.creds) {
         const email = r.creds.email
         setAccountEmail(email)
+        if (msg && mode === 'replyAll') setTo(buildReplyTo(mode, msg, email))
         window.api.contacts.list(email).then(res => {
           if (res.ok) setContacts(res.contacts || [])
         })
@@ -147,6 +151,7 @@ export default function ComposeViewerApp({ composeData }) {
       Placeholder.configure({ placeholder: 'Write your message…' }),
       Image.configure({ inline: true, allowBase64: true }),
     ],
+    onUpdate: () => setBodyVersion(v => v + 1),
     editorProps: {
       handlePaste(view, event) {
         const items = event.clipboardData?.items || []
@@ -216,7 +221,7 @@ export default function ComposeViewerApp({ composeData }) {
       if (result.ok && result.id && !draftId) setDraftId(result.id)
     }, 2000)
     return () => clearTimeout(draftTimer.current)
-  }, [to, cc, bcc, subject, attachments, accountEmail])
+  }, [to, cc, bcc, subject, attachments, accountEmail, bodyVersion])
 
   async function handleSend() {
     if (!to.trim()) { setError('compose.error.noRecipient'); return }
@@ -234,10 +239,14 @@ export default function ComposeViewerApp({ composeData }) {
       return
     }
 
+    const accRes = await window.api.accounts.list()
+    const account = accRes.ok ? accRes.accounts.find(a => a.email === creds.creds.email) : null
+    const fromName = account?.display_name || creds.creds.email
+
     const mailOptions = {
       to, cc: cc || undefined, bcc: bcc || undefined,
       subject, html, text,
-      fromName: creds.creds.email,
+      fromName,
       inReplyTo: msg?.message_id || undefined,
       references: msg?.message_id || undefined,
       attachments: attachments.map(a => ({ filename: a.name, path: a.path }))

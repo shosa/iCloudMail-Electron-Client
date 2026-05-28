@@ -81,7 +81,9 @@ contextBridge.exposeInMainWorld('api', {
     getViewerData: (id) =>
       ipcRenderer.invoke('store:get-viewer-data', id),
     getSyncState: (folder) =>
-      ipcRenderer.invoke('store:get-sync-state', folder)
+      ipcRenderer.invoke('store:get-sync-state', folder),
+    readLocalFile: (filePath) =>
+      ipcRenderer.invoke('store:read-local-file', filePath)
   },
 
   // ── Accounts ────────────────────────────────────────────────────────────────
@@ -123,10 +125,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Contacts ────────────────────────────────────────────────────────────────
   contacts: {
-    sync:   (email, password) => ipcRenderer.invoke('contacts:sync', email, password),
-    list:   (email)           => ipcRenderer.invoke('contacts:list', email),
-    search: (query, email)    => ipcRenderer.invoke('contacts:search', query, email),
-    clear:  (email)           => ipcRenderer.invoke('contacts:clear', email)
+    sync:    (email, password) => ipcRenderer.invoke('contacts:sync', email, password),
+    list:    (email)           => ipcRenderer.invoke('contacts:list', email),
+    search:  (query, email)    => ipcRenderer.invoke('contacts:search', query, email),
+    clear:   (email)           => ipcRenderer.invoke('contacts:clear', email),
+    dumpRaw: (email, password) => ipcRenderer.invoke('contacts:dump-raw', email, password)
   },
 
   // ── Calendar ────────────────────────────────────────────────────────────────
@@ -138,7 +141,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Dialog ──────────────────────────────────────────────────────────────────
   dialog: {
-    pickFiles: () => ipcRenderer.invoke('dialog:pick-files')
+    pickFiles: () => ipcRenderer.invoke('dialog:pick-files'),
+    saveFile: (sourcePath, filename) => ipcRenderer.invoke('dialog:save-file', sourcePath, filename)
   },
 
   // ── Push events (main → renderer) ───────────────────────────────────────────

@@ -151,6 +151,8 @@
   "contacts.search": "Search contacts…",
   "contacts.empty": "No contacts — click Sync to import",
   "contacts.selectContact": "Select a contact",
+  "contacts.clearAll": "Clear contacts",
+  "calendar.today": "Today",
   "calendar.noEvents": "No upcoming events — click Sync to import",
   "calendar.noEventsDay": "No events on this day",
   "calendar.selectEvent": "Select an event",
@@ -162,5 +164,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "Sign in to access your iCloud Mail. You'll need an app-specific password from Apple — not your regular Apple ID password.",
+  "setup.emailLabel": "iCloud Email",
+  "setup.passwordLabel": "App-Specific Password",
+  "setup.signIn": "Sign In",
+  "setup.connecting": "Connecting…",
+  "setup.helpText": "Don't have an app-specific password?",
+  "setup.helpLink": "Create one at Apple →",
+  "setup.error.connection": "Couldn't connect. Double-check your email and password.",
+  "setup.error.save": "Connected but couldn't save your credentials. Please try again."
 }

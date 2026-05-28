@@ -115,20 +115,44 @@ function reducer(state, action) {
     case 'SELECT_MESSAGE':
       return { ...state, messages: { ...state.messages, selected: action.payload } }
     case 'UPDATE_MESSAGE_FLAGS': {
+      const prev = state.messages.list.find(m => m.uid === action.payload.uid && m.folder === action.payload.folder)
       const list = state.messages.list.map(m =>
         m.uid === action.payload.uid && m.folder === action.payload.folder
           ? { ...m, flags: action.payload.flags }
           : m
       )
-      return { ...state, messages: { ...state.messages, list } }
+      // Keep folder unread_count in sync with local flag changes
+      const wasRead = prev?.flags?.includes('\\Seen')
+      const nowRead = action.payload.flags?.includes('\\Seen')
+      let folderList = state.folders.list
+      if (wasRead !== nowRead && action.payload.folder) {
+        const delta = nowRead ? -1 : 1
+        folderList = state.folders.list.map(f =>
+          f.path === action.payload.folder
+            ? { ...f, unread_count: Math.max(0, (f.unread_count || 0) + delta) }
+            : f
+        )
+      }
+      return { ...state, messages: { ...state.messages, list }, folders: { ...state.folders, list: folderList } }
     }
     case 'REMOVE_MESSAGE': {
+      const removed = state.messages.list.find(
+        m => m.uid === action.payload.uid && m.folder === action.payload.folder
+      )
       const list = state.messages.list.filter(
         m => !(m.uid === action.payload.uid && m.folder === action.payload.folder)
       )
       const selected = state.messages.selected?.uid === action.payload.uid
         ? null : state.messages.selected
-      return { ...state, messages: { ...state.messages, list, selected } }
+      const wasUnread = removed && !removed.flags?.includes('\\Seen')
+      const folderList = wasUnread && action.payload.folder
+        ? state.folders.list.map(f =>
+            f.path === action.payload.folder
+              ? { ...f, unread_count: Math.max(0, (f.unread_count || 0) - 1) }
+              : f
+          )
+        : state.folders.list
+      return { ...state, messages: { ...state.messages, list, selected }, folders: { ...state.folders, list: folderList } }
     }
     case 'SET_SEARCH_QUERY':
       return { ...state, messages: { ...state.messages, searchQuery: action.payload } }

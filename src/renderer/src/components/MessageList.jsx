@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import { IconSearch, IconClose, IconAttach, IconEnvelope, IconStar, IconReply, IconTrash, IconMarkRead } from './Icons'
@@ -64,6 +64,17 @@ export default function MessageList() {
   const [expandedThreads, setExpandedThreads] = useState(new Set())
 
   const folder = state.folders.selected
+
+  const contactMap = useMemo(() => {
+    const map = new Map()
+    for (const c of (state.contacts.list || [])) {
+      if (!c.display_name) continue
+      const add = (e) => { if (e && typeof e === 'string') map.set(e.toLowerCase(), c.display_name) }
+      add(c.email)
+      if (Array.isArray(c.emails)) c.emails.forEach(add)
+    }
+    return map
+  }, [state.contacts.list])
 
   function load(label) { dispatch({ type: 'SET_LOADING', payload: label }) }
   function done()      { dispatch({ type: 'CLEAR_LOADING' }) }
@@ -375,6 +386,7 @@ export default function MessageList() {
                     multiSelected={selectedKeys.has(msgKey(msg))}
                     threadCount={idx === 0 && isMulti ? threadMsgs.length : null}
                     isThreadChild={idx > 0}
+                    contactMap={contactMap}
                     onQuickAction={(type) => handleContextAction(type, [msg])}
                     onThreadExpand={isMulti && idx === 0 ? () => setExpandedThreads(prev => {
                       const next = new Set(prev)
@@ -428,11 +440,12 @@ export default function MessageList() {
   )
 }
 
-function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart, onQuickAction }) {
+function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart, onQuickAction, contactMap }) {
   const isUnread  = !message.flags?.includes('\\Seen')
   const isStarred = message.flags?.includes('\\Flagged')
-  const initials  = getInitials(message.from_name, message.from_email)
-  const color     = getAvatarColor(message.from_name || message.from_email)
+  const resolvedName = contactMap?.get(message.from_email?.toLowerCase()) || message.from_name || message.from_email || '?'
+  const initials  = getInitials(resolvedName, message.from_email)
+  const color     = getAvatarColor(resolvedName)
 
   return (
     <div
@@ -445,7 +458,7 @@ function MessageItem({ message, selected, multiSelected, threadCount, isThreadCh
       role="listitem"
       tabIndex={0}
       aria-selected={selected}
-      aria-label={`${message.from_name || message.from_email}: ${message.subject}`}
+      aria-label={`${resolvedName}: ${message.subject}`}
       onKeyDown={e => e.key === 'Enter' && onClick(e)}
     >
       <div
@@ -458,7 +471,7 @@ function MessageItem({ message, selected, multiSelected, threadCount, isThreadCh
       <div className="message-item__content">
         <div className="message-item__row1">
           <span className="message-item__sender">
-            {message.from_name || message.from_email || '?'}
+            {resolvedName}
           </span>
           {threadCount && (
             <span

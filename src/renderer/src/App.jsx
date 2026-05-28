@@ -95,6 +95,18 @@ export default function App() {
   const onSidebarDrag  = useResizeHandle(sidebarRef,  'sidebar',  SIDEBAR_MIN,  SIDEBAR_MAX,  onSidebarResize)
   const onMsglistDrag  = useResizeHandle(msglistRef,  'msglist',  MSGLIST_MIN,  MSGLIST_MAX,  onMsglistResize)
 
+  // Keep taskbar/tray badge in sync with local unread counts
+  useEffect(() => {
+    const total = state.folders.list.reduce((sum, f) => sum + (f.unread_count || 0), 0)
+    window.api.window.setBadge(total)
+  }, [state.folders.list])
+
+  // Restore display density from settings
+  useEffect(() => {
+    const scale = { compact: '0.85', comfortable: '1', spacious: '1.15' }[state.settings.displayDensity] || '1'
+    document.documentElement.style.setProperty('--density-scale', scale)
+  }, [state.settings.displayDensity])
+
   // System theme sync
   useEffect(() => {
     if (state.settings.theme !== 'system') return

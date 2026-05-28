@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
 import { useAppDispatch } from '../context/AppContext'
+import { useTranslation } from '../i18n/index'
+import logoUrl from '../assets/icon.png'
 
 export default function SetupScreen() {
   const dispatch = useAppDispatch()
+  const t = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,25 +18,23 @@ export default function SetupScreen() {
     setError(null)
 
     try {
-      // Test connection
       const connectResult = await window.api.imap.connect(email.trim(), password.trim())
       if (!connectResult.ok) {
-        setError(connectResult.error || 'Could not connect to iCloud. Check your credentials.')
+        setError(t('setup.error.connection'))
         setLoading(false)
         return
       }
 
-      // Save credentials via safeStorage
       const saveResult = await window.api.auth.saveCredentials(email.trim(), password.trim())
       if (!saveResult.ok) {
-        setError('Credentials saved but connection failed: ' + saveResult.error)
+        setError(t('setup.error.save'))
         setLoading(false)
         return
       }
 
       dispatch({ type: 'SET_AUTHENTICATED', payload: email.trim() })
-    } catch (err) {
-      setError(err.message || 'Connection failed')
+    } catch {
+      setError(t('setup.error.connection'))
       setLoading(false)
     }
   }
@@ -45,17 +46,14 @@ export default function SetupScreen() {
   return (
     <div className="setup-screen">
       <div className="setup-card">
-        <div className="setup-card__logo">✉</div>
+        <img src={logoUrl} alt="Kumo" className="setup-card__logo" />
 
         <h1 className="setup-card__title">Kumo</h1>
-        <p className="setup-card__subtitle">
-          Sign in with your iCloud email address and an app-specific password.
-          Your credentials are encrypted using Windows DPAPI.
-        </p>
+        <p className="setup-card__subtitle">{t('setup.subtitle')}</p>
 
         <form className="setup-form" onSubmit={handleSubmit}>
           <div>
-            <label className="input-label" htmlFor="email">iCloud Email Address</label>
+            <label className="input-label" htmlFor="email">{t('setup.emailLabel')}</label>
             <input
               id="email"
               type="email"
@@ -70,9 +68,7 @@ export default function SetupScreen() {
           </div>
 
           <div>
-            <label className="input-label" htmlFor="app-password">
-              App-Specific Password
-            </label>
+            <label className="input-label" htmlFor="app-password">{t('setup.passwordLabel')}</label>
             <input
               id="app-password"
               type="password"
@@ -96,21 +92,21 @@ export default function SetupScreen() {
             {loading ? (
               <>
                 <span className="spinner" style={{ width: 16, height: 16 }} />
-                Connecting…
+                {t('setup.connecting')}
               </>
             ) : (
-              'Sign In'
+              t('setup.signIn')
             )}
           </button>
 
           <p className="setup-help">
-            Need an app-specific password?{' '}
+            {t('setup.helpText')}{' '}
             <button
               type="button"
               onClick={openAppleHelp}
               style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', font: 'inherit', padding: 0 }}
             >
-              Learn how →
+              {t('setup.helpLink')}
             </button>
           </p>
         </form>

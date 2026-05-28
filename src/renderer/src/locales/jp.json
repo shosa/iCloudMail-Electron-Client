@@ -162,5 +162,14 @@
   "settings.clearContactsSuccess": "Contacts cleared",
   "settings.clearCalendar": "Clear Calendar",
   "settings.clearCalendarDesc": "Remove all synced calendar events from local storage",
-  "settings.clearCalendarSuccess": "Calendar cleared"
+  "settings.clearCalendarSuccess": "Calendar cleared",
+  "setup.subtitle": "iCloud メールにアクセスするにはサインインしてください。Apple のアプリ用パスワードが必要です（通常の Apple ID パスワードとは異なります）。",
+  "setup.emailLabel": "iCloud メールアドレス",
+  "setup.passwordLabel": "アプリ用パスワード",
+  "setup.signIn": "サインイン",
+  "setup.connecting": "接続中…",
+  "setup.helpText": "アプリ用パスワードをお持ちでない方は",
+  "setup.helpLink": "Apple で作成 →",
+  "setup.error.connection": "接続できませんでした。メールアドレスとパスワードをご確認ください。",
+  "setup.error.save": "接続に成功しましたが、認証情報を保存できませんでした。もう一度お試しください。"
 }
