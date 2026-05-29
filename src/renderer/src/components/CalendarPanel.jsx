@@ -172,7 +172,7 @@ export default function CalendarPanel() {
     if (state.auth.isAuthenticated && state.calendar.events.length === 0) {
       loadEvents()
     }
-  }, [state.auth.isAuthenticated])
+  }, [state.auth.isAuthenticated, state.calendar.events.length, loadEvents])
 
   const now = Date.now()
   const upcoming = (state.calendar.events || [])

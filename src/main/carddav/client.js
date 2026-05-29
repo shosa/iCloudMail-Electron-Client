@@ -337,7 +337,7 @@ ${hrefXml}
 
   if (res.status >= 400) throw new Error(`CardDAV multiget failed: ${res.status}`)
   const contacts = _parseVCardResponses(res.body, abUrl)
-  logContact(`Strategia 3 (multiget): trovati ${contacts.length} contatti`)
+  logContact(`Strategia 2b (multiget): trovati ${contacts.length} contatti`)
   return contacts
 }
 

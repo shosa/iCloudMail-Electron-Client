@@ -40,10 +40,6 @@ const initialState = {
     notifyFolders: ['INBOX'],
     language: 'en'
   },
-  accounts: {
-    list: [],          // [{ email, display_name, is_default, ... }]
-    activeEmail: null  // which account's folder tree is shown in sidebar
-  },
   view: 'mail',        // 'mail' | 'contacts' | 'calendar'
   contacts: {
     list: [],
@@ -133,7 +129,11 @@ function reducer(state, action) {
             : f
         )
       }
-      return { ...state, messages: { ...state.messages, list }, folders: { ...state.folders, list: folderList } }
+      const selected = state.messages.selected?.uid === action.payload.uid &&
+        state.messages.selected?.folder === action.payload.folder
+        ? { ...state.messages.selected, flags: action.payload.flags }
+        : state.messages.selected
+      return { ...state, messages: { ...state.messages, list, selected }, folders: { ...state.folders, list: folderList } }
     }
     case 'REMOVE_MESSAGE': {
       const removed = state.messages.list.find(
@@ -206,44 +206,6 @@ function reducer(state, action) {
     case 'REMOVE_NOTIFICATION':
       return { ...state, notifications: state.notifications.filter(n => n.id !== action.payload) }
 
-    // Accounts
-    case 'SET_ACCOUNTS':
-      return {
-        ...state,
-        accounts: {
-          ...state.accounts,
-          list: action.payload,
-          activeEmail: state.accounts.activeEmail || action.payload[0]?.email || null
-        }
-      }
-    case 'SWITCH_ACCOUNT':
-      return {
-        ...state,
-        accounts: { ...state.accounts, activeEmail: action.payload },
-        folders: { ...state.folders, selected: 'INBOX', list: [] },
-        messages: { ...state.messages, list: [], selected: null, page: 1, searchQuery: '', searchResults: null, loading: false, hasMore: false, total: 0, _newMailSignal: null, _syncSignal: null }
-      }
-    case 'ADD_ACCOUNT':
-      return {
-        ...state,
-        accounts: {
-          ...state.accounts,
-          list: [...state.accounts.list.filter(a => a.email !== action.payload.email), action.payload]
-        }
-      }
-    case 'REMOVE_ACCOUNT': {
-      const list = state.accounts.list.filter(a => a.email !== action.payload)
-      return {
-        ...state,
-        accounts: {
-          list,
-          activeEmail: state.accounts.activeEmail === action.payload
-            ? (list[0]?.email || null)
-            : state.accounts.activeEmail
-        }
-      }
-    }
-
     // View switching
     case 'SET_VIEW':
       return { ...state, view: action.payload }
@@ -279,23 +241,9 @@ export function AppProvider({ children }) {
   // Check for existing credentials on mount
   useEffect(() => {
     async function checkAuth() {
-      let accRes = { ok: false }
-      try {
-        accRes = await window.api.accounts.list()
-      } catch { /* IPC failure — fall through to credential check */ }
-      if (accRes.ok && accRes.accounts?.length) {
-        dispatch({ type: 'SET_ACCOUNTS', payload: accRes.accounts })
-        dispatch({ type: 'SET_AUTHENTICATED', payload: accRes.accounts[0].email })
-      } else {
-        const result = await window.api.auth.getCredentials()
-        if (result.ok && result.creds) {
-          dispatch({ type: 'SET_AUTHENTICATED', payload: result.creds.email })
-          await window.api.accounts.save({
-            email: result.creds.email,
-            display_name: result.creds.email,
-            is_default: 1
-          })
-        }
+      const result = await window.api.auth.getCredentials()
+      if (result.ok && result.creds) {
+        dispatch({ type: 'SET_AUTHENTICATED', payload: result.creds.email })
       }
       const settingsRes = await window.api.settings.get()
       if (settingsRes.ok) dispatch({ type: 'UPDATE_SETTINGS', payload: settingsRes.settings })

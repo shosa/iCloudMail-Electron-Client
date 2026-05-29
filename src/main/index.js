@@ -3,7 +3,6 @@ import { join, dirname, resolve, sep } from 'path'
 import {
   initDB, closeDB, searchMessages, getSettings, saveSetting,
   getFolders, clearBodyCache, clearFolderCache, getDbPath, resetAllData,
-  getAccounts, upsertAccount, deleteAccount,
   getDrafts, upsertDraft, deleteDraft,
   getSyncState,
   getAttachmentsMeta, markAttachmentDownloaded,
@@ -16,6 +15,11 @@ import { sendEmail } from './smtp/index.js'
 import { syncContacts, dumpRawContacts } from './carddav/client.js'
 import { syncCalendar } from './caldav/client.js'
 import { logContact, logErr } from './logger.js'
+
+// In dev mode, isolate data from the production install
+if (process.env.ELECTRON_RENDERER_URL) {
+  app.setPath('userData', app.getPath('userData') + '-dev')
+}
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'kumo-local', privileges: { secure: true, stream: true, bypassCSP: true } }
@@ -198,16 +202,17 @@ function updateTaskbarBadge(count) {
   if (!mainWindow) return
   if (count > 0) {
     try {
-      const size = 32
+      const size = 16
       const buf = Buffer.alloc(size * size * 4)
-      const cx = size / 2 - 0.5, cy = size / 2 - 0.5, r = size / 2 - 1.5
+      const r = 4.5
+      const cx = 7.5, cy = 7.5
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
           const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
           const alpha = Math.max(0, Math.min(1, r + 1 - dist)) * 255
           if (alpha > 0) {
             const idx = (y * size + x) * 4
-            buf[idx] = 255; buf[idx + 1] = 59; buf[idx + 2] = 48
+            buf[idx] = 48; buf[idx + 1] = 59; buf[idx + 2] = 255
             buf[idx + 3] = Math.round(alpha)
           }
         }
@@ -685,23 +690,6 @@ ipcMain.handle('settings:save', async (_e, updates) => {
   } catch (err) {
     return { ok: false, error: err.message }
   }
-})
-
-// ── Accounts IPC ─────────────────────────────────────────────────────────────
-
-ipcMain.handle('accounts:list', async () => {
-  try { return { ok: true, accounts: getAccounts() } }
-  catch (err) { return { ok: false, error: err.message } }
-})
-
-ipcMain.handle('accounts:save', async (_e, account) => {
-  try { upsertAccount(account); return { ok: true } }
-  catch (err) { return { ok: false, error: err.message } }
-})
-
-ipcMain.handle('accounts:delete', async (_e, email) => {
-  try { deleteAccount(email); return { ok: true } }
-  catch (err) { return { ok: false, error: err.message } }
 })
 
 // ── Drafts IPC ───────────────────────────────────────────────────────────────

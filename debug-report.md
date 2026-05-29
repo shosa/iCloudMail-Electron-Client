@@ -17,6 +17,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — Unrestricted arbitrary file read via `store:read-local-file` IPC
+> Path validated against `userData/attachments` using `resolve`+`sep`; requests outside that directory return `{ ok: false, error: 'Forbidden' }`
+
 ### [CRITICAL] — Unrestricted arbitrary file read via `store:read-local-file` IPC
 
 - **File:** `src/main/index.js` lines 611–619, `src/preload/index.js` lines 85–86
@@ -25,6 +28,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: Unrestricted arbitrary file read
 
 ---
+
+### ✅ RESOLVED — `resetAllData` leaves credentials, IMAP connections, and non-message tables intact
+> `db.js:resetAllData` now deletes all tables + FTS; IPC handler disconnects all IMAP clients and calls `deleteCredentials()`
 
 ### [HIGH] — `resetAllData` leaves credentials, IMAP connections, and non-message tables intact
 
@@ -35,6 +41,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — `deleteAccount` leaves messages, attachments, contacts, and calendar events in the DB
+> `db.js:deleteAccount` now cascades deletes to messages, FTS, contacts, calendar_events, drafts, attachments
+
 ### [HIGH] — `deleteAccount` leaves messages, attachments, contacts, and calendar events in the DB
 
 - **File:** `src/main/store/db.js` lines 696–700
@@ -43,6 +52,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: deleteAccount cascade
 
 ---
+
+### ✅ RESOLVED — Folder unread count not decremented when messages are deleted or moved in the UI
+> `AppContext.jsx:REMOVE_MESSAGE` now finds the removed message and decrements `unread_count` when it was unread
 
 ### [HIGH] — Folder unread count not decremented when messages are deleted or moved in the UI
 
@@ -53,6 +65,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — Display density setting not restored on application restart
+> Added `useEffect` in `App.jsx` watching `state.settings.displayDensity` and applying `--density-scale` CSS variable
+
 ### [HIGH] — Display density setting not restored on application restart
 
 - **File:** `src/renderer/src/components/Settings.jsx` lines 57–61, `src/renderer/src/App.jsx`
@@ -61,6 +76,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: Display density not persisted
 
 ---
+
+### ✅ RESOLVED — Compose auto-save misses body-only edits (TipTap editor not in deps)
+> Added `bodyVersion` state + `onUpdate` callback in both `ComposeWindow.jsx` and `ComposeViewerApp.jsx`; `bodyVersion` added to auto-save deps
 
 ### [HIGH] — Compose auto-save misses body-only edits (TipTap editor not in deps)
 
@@ -71,6 +89,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — `resetAllData` does not clear the FTS5 virtual table → stale index after reset
+> Added `DELETE FROM messages_fts` (try/catch) to `resetAllData` in `db.js`
+
 ### [HIGH] — `resetAllData` does not clear the FTS5 virtual table → stale index after reset
 
 - **File:** `src/main/store/db.js` lines 623–629
@@ -79,6 +100,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: resetAllData FTS not cleared
 
 ---
+
+### ✅ RESOLVED — `fromName` in outgoing mail uses email address instead of display name
+> Both compose components now fetch `accounts.list()` in `handleSend` and use `account.display_name || email`
 
 ### [HIGH] — `fromName` in outgoing mail uses email address instead of display name
 
@@ -89,6 +113,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — iCal TZID parameter silently ignored; non-UTC events get wrong timestamps
+> `parseICalDate` now accepts `tzid` param; DTSTART/DTEND extract TZID from rawProp and pass it; non-UTC events with TZID emit `console.warn`
+
 ### [MEDIUM] — iCal TZID parameter silently ignored; non-UTC events get wrong timestamps
 
 - **File:** `src/main/caldav/client.js` lines 106–113
@@ -98,6 +125,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — `getCredentials()` without email returns alphabetically first account, not default
+> `auth/index.js` now imports `getAccounts`, finds `is_default=1` account, uses its credential file; falls back to alphabetical
+
 ### [MEDIUM] — `getCredentials()` without email returns alphabetically first account, not default
 
 - **File:** `src/main/auth/index.js` line 33
@@ -106,6 +136,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: getCredentials default account
 
 ---
+
+### ✅ RESOLVED — `CalendarPanel` and `ContactsPanel` stale `useEffect` dependencies
+> Added `state.calendar.events.length, loadEvents` and `state.contacts.list.length, loadContacts` to their respective dep arrays
 
 ### [MEDIUM] — `CalendarPanel` and `ContactsPanel` stale `useEffect` dependencies
 
@@ -124,6 +157,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — Reply All includes the user's own email in the `To` field
+> `buildReplyTo` in both compose components accepts `selfEmail` and filters it; call sites pass the current user's email
+
 ### [MEDIUM] — Reply All includes the user's own email in the `To` field
 
 - **File:** `src/renderer/src/components/ComposeWindow.jsx` lines 46–52, `src/renderer/src/components/ComposeViewerApp.jsx` lines 39–45
@@ -132,6 +168,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: Reply All includes self
 
 ---
+
+### ✅ RESOLVED — `imap:download-attachment` `partId` parameter not sanitized (path traversal risk)
+> `safePartId` strips non-`[0-9.]` chars; `resolve(dest)` checked against `attDir + sep` before use
 
 ### [MEDIUM] — `imap:download-attachment` `partId` parameter not sanitized (path traversal risk)
 
@@ -147,6 +186,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — `allRows` and `oneRow` have unused `params` parameter
+> Removed dead `params = []` second parameter from both functions in `db.js`
+
 ### [LOW] — `allRows` and `oneRow` have unused `params` parameter
 
 - **File:** `src/main/store/db.js` lines 369, 378
@@ -155,6 +197,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: Remove unused params
 
 ---
+
+### ✅ RESOLVED — Dynamic `import('path')` inside IPC handler when `path` is already statically imported
+> Added `dirname, resolve, sep` to static `import from 'path'` at line 2; removed `await import('path')` from `store:open-db-folder`
 
 ### [LOW] — Dynamic `import('path')` inside IPC handler when `path` is already statically imported
 
@@ -165,6 +210,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 
 ---
 
+### ✅ RESOLVED — CardDAV multiget logs "Strategia 3" when it is in fact Strategy 2b
+> Changed log label to "Strategia 2b (multiget)" in `carddav/client.js:341`
+
 ### [LOW] — CardDAV multiget logs "Strategia 3" when it is in fact Strategy 2b
 
 - **File:** `src/main/carddav/client.js` line 341
@@ -173,6 +221,9 @@ The codebase is well-structured and functional for a personal mail client, but h
 - **Resolution prompt:** See § Fix: CardDAV log label
 
 ---
+
+### ✅ RESOLVED — `_runMigrations` redundantly calls `_migrate2` and `_migrate3` on fresh install
+> Removed the two tail calls at the end of `_runMigrations`; `initDB` already calls them independently
 
 ### [LOW] — `_runMigrations` redundantly calls `_migrate2` and `_migrate3` on fresh install
 

@@ -662,52 +662,6 @@ export function upsertSyncState(accountEmail, folder, lastUid, messageCount) {
   scheduleSave()
 }
 
-// ── accounts helpers ──────────────────────────────────────────────────────────
-
-export function upsertAccount(account) {
-  const d = getDB()
-  d.run(`
-    INSERT INTO accounts (email, display_name, imap_host, imap_port, smtp_host, smtp_port, auth_type, is_default)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(email) DO UPDATE SET
-      display_name = excluded.display_name,
-      imap_host    = excluded.imap_host,
-      imap_port    = excluded.imap_port,
-      smtp_host    = excluded.smtp_host,
-      smtp_port    = excluded.smtp_port,
-      auth_type    = excluded.auth_type,
-      is_default   = excluded.is_default
-  `, [
-    account.email,
-    account.display_name || account.email,
-    account.imap_host  || 'imap.mail.me.com',
-    account.imap_port  || 993,
-    account.smtp_host  || 'smtp.mail.me.com',
-    account.smtp_port  || 587,
-    account.auth_type  || 'password',
-    account.is_default ? 1 : 0
-  ])
-  scheduleSave()
-}
-
-export function getAccounts() {
-  const d = getDB()
-  return allRows(d.prepare(`SELECT * FROM accounts ORDER BY is_default DESC, id ASC`))
-}
-
-export function deleteAccount(email) {
-  const d = getDB()
-  try { d.run(`DELETE FROM messages_fts WHERE folder IN (SELECT DISTINCT folder FROM messages WHERE account_email = ?)`, [email]) } catch { /* FTS5 best-effort */ }
-  d.run(`DELETE FROM messages WHERE account_email = ?`, [email])
-  d.run(`DELETE FROM attachments WHERE uid NOT IN (SELECT uid FROM messages)`)
-  d.run(`DELETE FROM contacts WHERE account_email = ?`, [email])
-  d.run(`DELETE FROM calendar_events WHERE account_email = ?`, [email])
-  d.run(`DELETE FROM drafts WHERE account_email = ?`, [email])
-  d.run(`DELETE FROM sync_state WHERE account_email = ?`, [email])
-  d.run(`DELETE FROM accounts WHERE email = ?`, [email])
-  scheduleSave()
-}
-
 // ── draft helpers ─────────────────────────────────────────────────────────────
 
 export function upsertDraft(draft) {

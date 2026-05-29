@@ -155,7 +155,7 @@ export default function ContactsPanel() {
     if (state.auth.isAuthenticated && state.contacts.list.length === 0) {
       loadContacts()
     }
-  }, [state.auth.isAuthenticated])
+  }, [state.auth.isAuthenticated, state.contacts.list.length, loadContacts])
 
   const displayed = localSearch.trim()
     ? state.contacts.list.filter(c => {

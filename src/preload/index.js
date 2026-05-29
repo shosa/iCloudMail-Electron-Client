@@ -86,13 +86,6 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('store:read-local-file', filePath)
   },
 
-  // ── Accounts ────────────────────────────────────────────────────────────────
-  accounts: {
-    list:   ()        => ipcRenderer.invoke('accounts:list'),
-    save:   (account) => ipcRenderer.invoke('accounts:save', account),
-    delete: (email)   => ipcRenderer.invoke('accounts:delete', email)
-  },
-
   // ── Drafts ──────────────────────────────────────────────────────────────────
   drafts: {
     list:   (accountEmail) => ipcRenderer.invoke('drafts:list', accountEmail),

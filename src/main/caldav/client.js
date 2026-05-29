@@ -106,12 +106,14 @@ export function parseICalEvents(icsData) {
         case 'RRULE':       event.rrule = val; break
         case 'ORGANIZER':   event.organizer = val.replace(/^MAILTO:/i, ''); break
         case 'DTSTART': {
-          const parsed = parseICalDate(val.split(';').pop())
+          const tzidMatch = rawProp.match(/TZID=([^;:]+)/i)
+          const parsed = parseICalDate(val.split(';').pop(), tzidMatch?.[1] || null)
           if (parsed) { event.start_ts = parsed.ts; event.all_day = parsed.allDay }
           break
         }
         case 'DTEND': {
-          const parsed = parseICalDate(val.split(';').pop())
+          const tzidMatch = rawProp.match(/TZID=([^;:]+)/i)
+          const parsed = parseICalDate(val.split(';').pop(), tzidMatch?.[1] || null)
           if (parsed) event.end_ts = parsed.ts
           break
         }
