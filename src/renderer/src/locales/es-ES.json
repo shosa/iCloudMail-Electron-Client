@@ -173,5 +173,11 @@
   "setup.helpText": "¿No tienes una contraseña específica de app?",
   "setup.helpLink": "Créala en Apple →",
   "setup.error.connection": "No se pudo conectar. Comprueba tu email y contraseña.",
-  "setup.error.save": "Conexión correcta pero no se pudieron guardar las credenciales. Inténtalo de nuevo."
+  "setup.error.save": "Conexión correcta pero no se pudieron guardar las credenciales. Inténtalo de nuevo.",
+  "update.available": "Kumo {0} está disponible",
+  "update.download": "Descargar",
+  "update.later": "Más tarde",
+  "update.downloading": "Descargando… {0}%",
+  "update.ready": "Kumo {0} listo para instalar",
+  "update.restart": "Reiniciar y Actualizar"
 }

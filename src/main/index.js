@@ -15,6 +15,7 @@ import { sendEmail } from './smtp/index.js'
 import { syncContacts, dumpRawContacts } from './carddav/client.js'
 import { syncCalendar } from './caldav/client.js'
 import { logContact, logErr } from './logger.js'
+import { initUpdater } from './updater.js'
 
 // In dev mode, isolate data from the production install
 if (process.env.ELECTRON_RENDERER_URL) {
@@ -1044,6 +1045,7 @@ app.whenReady().then(async () => {
   await initDB()
   createWindow()
   createTray()
+  initUpdater(mainWindow)
 
   let storedEmails = []
   try {

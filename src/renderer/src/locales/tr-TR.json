@@ -173,5 +173,11 @@
   "setup.helpText": "Uygulamaya özel şifreniz yok mu?",
   "setup.helpLink": "Apple'da oluştur →",
   "setup.error.connection": "Bağlanılamadı. E-posta ve şifrenizi kontrol edin.",
-  "setup.error.save": "Bağlandı ancak kimlik bilgileri kaydedilemedi. Tekrar deneyin."
+  "setup.error.save": "Bağlandı ancak kimlik bilgileri kaydedilemedi. Tekrar deneyin.",
+  "update.available": "Kumo {0} kullanılabilir",
+  "update.download": "İndir",
+  "update.later": "Daha sonra",
+  "update.downloading": "İndiriliyor… {0}%",
+  "update.ready": "Kumo {0} kurulmaya hazır",
+  "update.restart": "Yeniden Başlat ve Güncelle"
 }

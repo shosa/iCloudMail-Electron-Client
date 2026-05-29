@@ -173,5 +173,11 @@
   "setup.helpText": "Нет пароля для программы?",
   "setup.helpLink": "Создать на Apple →",
   "setup.error.connection": "Не удалось подключиться. Проверьте email и пароль.",
-  "setup.error.save": "Подключение успешно, но не удалось сохранить учётные данные. Попробуйте снова."
+  "setup.error.save": "Подключение успешно, но не удалось сохранить учётные данные. Попробуйте снова.",
+  "update.available": "Kumo {0} доступен",
+  "update.download": "Скачать",
+  "update.later": "Позже",
+  "update.downloading": "Загрузка… {0}%",
+  "update.ready": "Kumo {0} готов к установке",
+  "update.restart": "Перезапустить и обновить"
 }

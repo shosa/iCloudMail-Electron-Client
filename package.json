@@ -1,6 +1,6 @@
 {
   "name": "Kumo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "iCloud Mail desktop client for Windows",
   "main": "out/main/index.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "@tiptap/extension-underline": "^2.2.4",
     "@tiptap/react": "^2.2.4",
     "@tiptap/starter-kit": "^2.2.4",
+    "electron-updater": "^6.8.3",
     "imapflow": "^1.0.162",
     "mailparser": "^3.9.8",
     "nodemailer": "^6.9.12",
@@ -78,6 +79,11 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Kumo"
     },
-    "asar": true
+    "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "shosa",
+      "repo": "Kumo"
+    }
   }
 }

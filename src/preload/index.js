@@ -138,9 +138,16 @@ contextBridge.exposeInMainWorld('api', {
     saveFile: (sourcePath, filename) => ipcRenderer.invoke('dialog:save-file', sourcePath, filename)
   },
 
+  // ── Updater ─────────────────────────────────────────────────────────────────
+  updater: {
+    check:    () => ipcRenderer.invoke('updater:check'),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install:  () => ipcRenderer.invoke('updater:install')
+  },
+
   // ── Push events (main → renderer) ───────────────────────────────────────────
   on: (channel, callback) => {
-    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'imap:flags-updated', 'open-compose', 'imap:notification-click']
+    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'imap:flags-updated', 'open-compose', 'imap:notification-click', 'updater:status']
     if (!allowed.includes(channel)) return
     const sub = (_event, ...args) => callback(...args)
     ipcRenderer.on(channel, sub)

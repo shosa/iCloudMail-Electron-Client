@@ -1,3 +1,75 @@
+/* ── Update banner ───────────────────────────────────────────────────────── */
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px var(--sp-4);
+  background: rgba(0, 113, 227, 0.18);
+  border-bottom: 1px solid rgba(0, 113, 227, 0.30);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  animation: banner-slide-in 250ms var(--ease-out);
+}
+
+.update-banner--ready {
+  background: rgba(48, 209, 88, 0.15);
+  border-bottom-color: rgba(48, 209, 88, 0.30);
+}
+
+@keyframes banner-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.update-banner__text {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.update-banner__btn {
+  padding: 3px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.update-banner__btn:hover {
+  background: var(--glass-fill-hover);
+}
+
+.update-banner__btn--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.update-banner__btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.update-banner__bar {
+  width: 120px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--glass-border);
+  overflow: hidden;
+}
+
+.update-banner__bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  transition: width 200ms linear;
+}
+
 /* ── Glass card / surface ────────────────────────────────────────────────── */
 
 .glass-card {

@@ -173,5 +173,11 @@
   "setup.helpText": "Pas encore de mot de passe spécifique ?",
   "setup.helpLink": "En créer un chez Apple →",
   "setup.error.connection": "Connexion impossible. Vérifiez votre adresse et votre mot de passe.",
-  "setup.error.save": "Connecté mais impossible de sauvegarder les identifiants. Réessayez."
+  "setup.error.save": "Connecté mais impossible de sauvegarder les identifiants. Réessayez.",
+  "update.available": "Kumo {0} est disponible",
+  "update.download": "Télécharger",
+  "update.later": "Plus tard",
+  "update.downloading": "Téléchargement… {0}%",
+  "update.ready": "Kumo {0} prêt à installer",
+  "update.restart": "Redémarrer et Mettre à jour"
 }

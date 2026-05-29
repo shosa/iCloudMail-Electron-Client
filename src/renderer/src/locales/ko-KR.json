@@ -173,5 +173,11 @@
   "setup.helpText": "앱 전용 비밀번호가 없으신가요?",
   "setup.helpLink": "Apple에서 생성 →",
   "setup.error.connection": "연결할 수 없습니다. 이메일과 비밀번호를 확인하세요.",
-  "setup.error.save": "연결되었지만 자격 증명을 저장할 수 없습니다. 다시 시도하세요."
+  "setup.error.save": "연결되었지만 자격 증명을 저장할 수 없습니다. 다시 시도하세요.",
+  "update.available": "Kumo {0} 업데이트가 있습니다",
+  "update.download": "다운로드",
+  "update.later": "나중에",
+  "update.downloading": "다운로드 중… {0}%",
+  "update.ready": "Kumo {0} 설치 준비 완료",
+  "update.restart": "재시작 및 업데이트"
 }

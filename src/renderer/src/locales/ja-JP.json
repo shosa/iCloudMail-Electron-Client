@@ -173,5 +173,11 @@
   "setup.helpText": "アプリ用パスワードをお持ちでない方は",
   "setup.helpLink": "Apple で作成 →",
   "setup.error.connection": "接続できませんでした。メールアドレスとパスワードをご確認ください。",
-  "setup.error.save": "接続に成功しましたが、認証情報を保存できませんでした。もう一度お試しください。"
+  "setup.error.save": "接続に成功しましたが、認証情報を保存できませんでした。もう一度お試しください。",
+  "update.available": "Kumo {0} が利用可能です",
+  "update.download": "ダウンロード",
+  "update.later": "後で",
+  "update.downloading": "ダウンロード中… {0}%",
+  "update.ready": "Kumo {0} インストール準備完了",
+  "update.restart": "再起動してアップデート"
 }

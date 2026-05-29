@@ -173,5 +173,11 @@
   "setup.helpText": "Don't have an app-specific password?",
   "setup.helpLink": "Create one at Apple →",
   "setup.error.connection": "Couldn't connect. Double-check your email and password.",
-  "setup.error.save": "Connected but couldn't save your credentials. Please try again."
+  "setup.error.save": "Connected but couldn't save your credentials. Please try again.",
+  "update.available": "Kumo {0} is available",
+  "update.download": "Download",
+  "update.later": "Later",
+  "update.downloading": "Downloading update… {0}%",
+  "update.ready": "Kumo {0} ready to install",
+  "update.restart": "Restart & Update"
 }

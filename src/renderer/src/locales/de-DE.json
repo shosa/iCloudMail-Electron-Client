@@ -173,5 +173,11 @@
   "setup.helpText": "Kein App-spezifisches Passwort?",
   "setup.helpLink": "Bei Apple erstellen →",
   "setup.error.connection": "Verbindung fehlgeschlagen. Überprüfe E-Mail und Passwort.",
-  "setup.error.save": "Verbunden, aber Anmeldedaten konnten nicht gespeichert werden. Versuche es erneut."
+  "setup.error.save": "Verbunden, aber Anmeldedaten konnten nicht gespeichert werden. Versuche es erneut.",
+  "update.available": "Kumo {0} ist verfügbar",
+  "update.download": "Herunterladen",
+  "update.later": "Später",
+  "update.downloading": "Download läuft… {0}%",
+  "update.ready": "Kumo {0} bereit zur Installation",
+  "update.restart": "Neu starten & Aktualisieren"
 }

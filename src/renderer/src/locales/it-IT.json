@@ -173,5 +173,11 @@
   "setup.helpText": "Non hai una password specifica per app?",
   "setup.helpLink": "Creane una su Apple →",
   "setup.error.connection": "Connessione non riuscita. Controlla email e password.",
-  "setup.error.save": "Connesso ma impossibile salvare le credenziali. Riprova."
+  "setup.error.save": "Connesso ma impossibile salvare le credenziali. Riprova.",
+  "update.available": "Kumo {0} è disponibile",
+  "update.download": "Scarica",
+  "update.later": "Più tardi",
+  "update.downloading": "Download in corso… {0}%",
+  "update.ready": "Kumo {0} pronto all'installazione",
+  "update.restart": "Riavvia e Aggiorna"
 }

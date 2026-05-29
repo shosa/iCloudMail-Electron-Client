@@ -10,6 +10,7 @@ import CalendarPanel from './components/CalendarPanel'
 import ComposeWindow from './components/ComposeWindow'
 import Settings from './components/Settings'
 import TitleBar from './components/TitleBar'
+import UpdateBanner from './components/UpdateBanner'
 
 const SIDEBAR_MIN  = 180
 const SIDEBAR_MAX  = 320
@@ -204,6 +205,7 @@ export default function App() {
   return (
     <div className={`app-root theme-${resolvedTheme}`}>
       <TitleBar connectionStatus={state.connectionStatus} />
+      <UpdateBanner />
       <Toolbar />
       <div className="app-layout">
         <div className="app-layout__sidebar" ref={sidebarRef}>
