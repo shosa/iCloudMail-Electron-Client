@@ -557,10 +557,12 @@ export function saveSetting(key, value) {
   scheduleSave()
 }
 
-export function getLocalUids(folder) {
+export function getLocalUids(folder, accountEmail) {
   const d = getDB()
-  const stmt = d.prepare(`SELECT uid FROM messages WHERE folder = ?`)
-  stmt.bind([folder])
+  const stmt = accountEmail
+    ? d.prepare(`SELECT uid FROM messages WHERE folder = ? AND account_email = ?`)
+    : d.prepare(`SELECT uid FROM messages WHERE folder = ?`)
+  accountEmail ? stmt.bind([folder, accountEmail]) : stmt.bind([folder])
   const uids = []
   while (stmt.step()) uids.push(stmt.getAsObject().uid)
   stmt.free()

@@ -8,7 +8,7 @@
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)](https://reactjs.org)
 [![SQLite](https://img.shields.io/badge/SQLite-WASM-003B57?logo=sqlite&logoColor=white)](https://sql.js.org)
 [![iCloud](https://img.shields.io/badge/iCloud-IMAP%20%2F%20SMTP-3693F3?logo=icloud&logoColor=white)](https://support.apple.com/HT204397)
-[![i18n](https://img.shields.io/badge/languages-8-blueviolet)](#frequently-asked-questions)
+[![i18n](https://img.shields.io/badge/languages-12-blueviolet)](#frequently-asked-questions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 </div>
@@ -90,7 +90,6 @@ Once connected, your inbox will appear with your most recent messages. Kumo will
 
 The following features are not yet available in this version of Kumo:
 
-- **Sending email is currently unavailable** due to a bug being fixed. This will be resolved in the next release.
 - **Drafts are stored on this device only.** They will not appear in Apple Mail, iCloud.com, or on other devices.
 - **No folder creation or renaming.** You can view and use existing folders from your iCloud account, but you cannot create new ones inside Kumo. Use iCloud.com or Apple Mail to create folders.
 - **Calendar events in some time zones may display at the wrong time.** Events with a specific city/region time zone (for example, events created in New York time from an iPhone) may show at a slightly wrong time on this device if its clock is set to a different time zone.
@@ -151,7 +150,7 @@ The following features are not yet available in this version of Kumo:
 ## Frequently Asked Questions
 
 **Q: Is my password stored on my device?**
-A: Yes, your app-specific password is stored in your operating system's secure credential storage (Windows Credential Manager). It is encrypted and only accessible by Kumo on this device. It is never sent to any server other than Apple's own mail servers.
+A: Yes, your app-specific password is encrypted and stored in a file inside Kumo's private data folder using the Windows Data Protection API (DPAPI) via Electron's built-in `safeStorage`. The encrypted file can only be decrypted by the same Windows user account on this device. It is never sent to any server other than Apple's own mail servers.
 
 **Q: Can I use Kumo with a Gmail, Outlook, or Yahoo account?**
 A: No. Kumo is designed specifically for iCloud accounts. Support for other mail providers is not planned at this time.
@@ -171,14 +170,14 @@ A: Deleting a message moves it to your iCloud Trash folder. It will remain there
 **Q: Why does Kumo show a Windows security warning on install?**
 A: This warning ("Windows protected your PC") appears because the installer does not yet have a paid code-signing certificate. The app is safe to install. Click "More info" and then "Run anyway" to proceed.
 
-**Q: My notification showed someone else's name/avatar. What happened?**
-A: This is a known visual glitch when multiple emails arrive at the same time. It does not affect the actual delivery or reading of your email. This will be corrected in a future update.
+**Q: What languages does Kumo support?**
+A: Kumo's interface is available in English, Italian, French, German, Spanish, Portuguese (Brazil), Dutch, Russian, Turkish, Korean, Japanese, and Simplified Chinese. You can change the language from the setup screen or from Settings at any time.
 
 ---
 
 ## Privacy Statement
 
-Kumo connects directly between your device and Apple's iCloud mail, contacts, and calendar servers (imap.mail.me.com, smtp.mail.me.com, contacts.icloud.com, caldav.icloud.com). No data is routed through any intermediate server operated by the Kumo developers. Your email content, contacts, and calendar events are downloaded directly to your device and stored in a local database in your user data folder. Your app-specific password is encrypted and stored locally using Windows Credential Manager — it is never transmitted to any party other than Apple. The app does not collect analytics, does not send telemetry, and does not contact any server other than Apple's own infrastructure.
+Kumo connects directly between your device and Apple's iCloud mail, contacts, and calendar servers (imap.mail.me.com, smtp.mail.me.com, contacts.icloud.com, caldav.icloud.com). No data is routed through any intermediate server operated by the Kumo developers. Your email content, contacts, and calendar events are downloaded directly to your device and stored in a local SQLite database in your user data folder. Your app-specific password is encrypted at rest using the Windows Data Protection API (DPAPI) via Electron's `safeStorage` — it is never transmitted to any party other than Apple's servers. The app does not collect analytics, does not send telemetry, and does not contact any server other than Apple's own infrastructure.
 
 ---
 

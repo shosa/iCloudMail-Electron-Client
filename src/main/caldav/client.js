@@ -276,7 +276,7 @@ async function fetchCalendarEvents(calUrl, auth) {
     logCal(`REPORT fallito (${res.status}), provo PROPFIND…`)
     const fallback = await followRedirects(calUrl, 'PROPFIND', auth, `<?xml version="1.0" encoding="UTF-8"?>
 <propfind xmlns="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
-  <prop><d:getetag/><cal:calendar-data/></prop>
+  <prop><getetag/><cal:calendar-data/></prop>
 </propfind>`)
     if (fallback.status >= 400) {
       logCal(`PROPFIND fallito (${fallback.status}), nessun evento`)

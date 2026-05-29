@@ -221,7 +221,7 @@ export default function ComposeViewerApp({ composeData }) {
       if (result.ok && result.id && !draftId) setDraftId(result.id)
     }, 2000)
     return () => clearTimeout(draftTimer.current)
-  }, [to, cc, bcc, subject, attachments, accountEmail, bodyVersion])
+  }, [to, cc, bcc, subject, attachments, accountEmail, bodyVersion, draftId])
 
   async function handleSend() {
     if (!to.trim()) { setError('compose.error.noRecipient'); return }
@@ -239,9 +239,7 @@ export default function ComposeViewerApp({ composeData }) {
       return
     }
 
-    const accRes = await window.api.accounts.list()
-    const account = accRes.ok ? accRes.accounts.find(a => a.email === creds.creds.email) : null
-    const fromName = account?.display_name || creds.creds.email
+    const fromName = creds.creds.email
 
     const mailOptions = {
       to, cc: cc || undefined, bcc: bcc || undefined,

@@ -76,9 +76,11 @@ function _attachExternalLinkHandler(win) {
 
   // Intercept iframe navigation (e.g. link clicked inside email body iframe)
   win.webContents.on('will-frame-navigate', (event) => {
-    if (!isLocal(event.url) && !event.isMainFrame) {
-      event.preventDefault()
-      openUrl(event.url)
+    if (!event.isMainFrame) {
+      if (event.url.startsWith('kumo-local://') || !isLocal(event.url)) {
+        event.preventDefault()
+        if (!event.url.startsWith('kumo-local://')) openUrl(event.url)
+      }
     }
   })
 }
@@ -277,8 +279,8 @@ function showNewMailNotification(subject, from, folder, uid) {
   try {
     const icon = _makeAvatarIcon(from)
     const n = new Notification({
-      title: 'Nuovo Messaggio',
-      body: `Da: ${from || '?'}\n${subject || '(nessun oggetto)'}`,
+      title: from || 'Kumo',
+      body: subject || '(No subject)',
       icon,
       silent: false
     })
@@ -1023,10 +1025,15 @@ app.whenReady().then(async () => {
     try {
       let filePath = decodeURIComponent(new URL(request.url).pathname)
       if (filePath.startsWith('/')) filePath = filePath.slice(1)
-      filePath = filePath.replace(/\//g, '\\')
+      filePath = filePath.replace(/\//g, sep)
+      const attDir = join(app.getPath('userData'), 'attachments')
+      const resolved = resolve(filePath)
+      if (!resolved.startsWith(attDir + sep) && resolved !== attDir) {
+        return new Response(null, { status: 403 })
+      }
       const { readFile } = await import('fs/promises')
-      const data = await readFile(filePath)
-      const ext = (filePath.split('.').pop() || '').toLowerCase()
+      const data = await readFile(resolved)
+      const ext = (resolved.split('.').pop() || '').toLowerCase()
       const mimeType = KUMO_MIME[ext] || 'application/octet-stream'
       return new Response(data, { headers: { 'content-type': mimeType } })
     } catch {

@@ -201,10 +201,12 @@ export class ImapClient extends EventEmitter {
             if (!this.connected) break
             console.error('IDLE loop error:', err.message)
             await new Promise(r => setTimeout(r, 5000))
+            if (!this.connected || !this.idleClient?.usable) break
           }
         }
         lock.release()
         this._idleLock = null
+        if (this.connected) this._scheduleReconnect()
       }
       keepIdling().catch(console.error)
     } catch (err) {
@@ -339,7 +341,7 @@ export class ImapClient extends EventEmitter {
       // Always fetch the full UID set from server — this is the source of truth
       const serverUids   = total > 0 ? await this.client.search({ all: true }, { uid: true }) : []
       const serverUidSet = new Set(serverUids)
-      const localUids    = getLocalUids(folder)
+      const localUids    = getLocalUids(folder, this.email)
       const localUidSet  = new Set(localUids)
 
       // 1. Remove messages deleted from server (UID reconciliation)

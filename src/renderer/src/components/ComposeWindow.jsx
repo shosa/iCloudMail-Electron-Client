@@ -227,7 +227,7 @@ export default function ComposeWindow() {
       if (result.ok && result.id && !draftId) setDraftId(result.id)
     }, 2000)
     return () => clearTimeout(draftTimer.current)
-  }, [to, cc, bcc, subject, attachments, bodyVersion])
+  }, [to, cc, bcc, subject, attachments, bodyVersion, draftId])
 
   async function handleSend() {
     if (!to.trim()) { setError(t('compose.error.noRecipient')); return }
@@ -245,9 +245,7 @@ export default function ComposeWindow() {
       return
     }
 
-    const accRes = await window.api.accounts.list()
-    const account = accRes.ok ? accRes.accounts.find(a => a.email === creds.creds.email) : null
-    const fromName = account?.display_name || creds.creds.email
+    const fromName = creds.creds.email
 
     const mailOptions = {
       to,

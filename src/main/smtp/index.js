@@ -16,8 +16,6 @@ export async function sendEmail(email, password, options) {
     }
   })
 
-  await transporter.verify()
-
   const info = await transporter.sendMail({
     from: `"${options.fromName || email}" <${email}>`,
     to: options.to,

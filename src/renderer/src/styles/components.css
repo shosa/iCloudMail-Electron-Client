@@ -1399,7 +1399,8 @@
   width: 80px;
   height: 80px;
   object-fit: contain;
-  margin-bottom: var(--sp-5);
+  display: block;
+  margin: 0 auto var(--sp-5);
 }
 
 .setup-card__title {
@@ -1408,6 +1409,7 @@
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   margin-bottom: var(--sp-2);
+  text-align: center;
 }
 
 .setup-card__subtitle {
@@ -1415,6 +1417,7 @@
   color: var(--text-secondary);
   margin-bottom: var(--sp-6);
   line-height: 1.5;
+  text-align: center;
 }
 
 .setup-form { display: flex; flex-direction: column; gap: var(--sp-4); }
