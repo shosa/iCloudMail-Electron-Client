@@ -26,7 +26,15 @@
       "Bash(git commit *)",
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\styles\\\\components.css\" | Measure-Object -Line\\).Lines)",
       "Bash(Copy-Item \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\resources\\\\icon.png\" \"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\src\\\\renderer\\\\src\\\\assets\\\\icon.png\")",
-      "Bash(Set-Content *)"
+      "Bash(Set-Content *)",
+      "Bash(git push *)",
+      "Bash(findstr version *)",
+      "Bash(gh release *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(cmdkey *)",
+      "PowerShell(cd \"C:/Users/StefanoSolidoro/Desktop/test\"; git tag -l; $token = [CredMan]::GetPassword\\(\"git:https://github.com\"\\); $headers = @{ Authorization = \"Bearer $token\"; Accept = \"application/vnd.github+json\" }; \\(Invoke-RestMethod -Uri \"https://api.github.com/repos/shosa/Kumo/releases\" -Headers $headers\\) | Select-Object -First 3 tag_name, name)",
+      "PowerShell(cd \"C:/Users/StefanoSolidoro/Desktop/test\"; Get-ChildItem resources/ | Select-Object Name, Length; Add-Type -AssemblyName System.Drawing; $ico = New-Object System.Drawing.Icon\\(\"resources/icon.ico\"\\); $ico.Width; $ico.Height)",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $ico = New-Object System.Drawing.Icon\\(\"C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\resources\\\\icon.ico\"\\); Write-Host \"Width=$\\($ico.Width\\) Height=$\\($ico.Height\\) Size=$\\(\\(Get-Item 'C:\\\\Users\\\\StefanoSolidoro\\\\Desktop\\\\test\\\\resources\\\\icon.ico'\\).Length\\)\"; $ico.Dispose\\(\\))"
     ]
   }
 }
