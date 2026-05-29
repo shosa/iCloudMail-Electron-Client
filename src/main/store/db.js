@@ -100,7 +100,7 @@ export async function initDB() {
     notifyFolders: ['INBOX'],
     signature: '',
     theme: 'light',
-    language: 'en'
+    language: 'en-US'
   }
   for (const [key, value] of Object.entries(defaults)) {
     db.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, JSON.stringify(value)])

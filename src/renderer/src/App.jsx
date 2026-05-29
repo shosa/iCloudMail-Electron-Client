@@ -141,8 +141,8 @@ export default function App() {
     const offFlags = window.api.on('imap:flags-updated', ({ folder, uid, flags }) => {
       dispatch({ type: 'UPDATE_MESSAGE_FLAGS', payload: { folder, uid, flags } })
     })
-    const offNotifClick = window.api.on('imap:notification-click', ({ folder }) => {
-      dispatch({ type: 'SELECT_FOLDER', payload: folder })
+    const offNotifClick = window.api.on('imap:notification-click', ({ folder, uid }) => {
+      dispatch({ type: 'NOTIF_OPEN_MAIL', payload: { folder, uid } })
     })
     return () => {
       offNewMail?.(); offStatus?.(); offCompose?.()

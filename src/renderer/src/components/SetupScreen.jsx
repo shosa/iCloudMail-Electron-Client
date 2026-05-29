@@ -1,11 +1,33 @@
 import React, { useState } from 'react'
-import { useAppDispatch } from '../context/AppContext'
+import { useAppDispatch, useAppState } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import logoUrl from '../assets/icon.png'
 
+const SETUP_LANGUAGES = [
+  { code: 'en-US', label: 'English' },
+  { code: 'it-IT', label: 'Italiano' },
+  { code: 'fr-FR', label: 'Français' },
+  { code: 'de-DE', label: 'Deutsch' },
+  { code: 'es-ES', label: 'Español' },
+  { code: 'pt-BR', label: 'Português (BR)' },
+  { code: 'nl-NL', label: 'Nederlands' },
+  { code: 'ru-RU', label: 'Русский' },
+  { code: 'tr-TR', label: 'Türkçe' },
+  { code: 'ko-KR', label: '한국어' },
+  { code: 'ja-JP', label: '日本語' },
+  { code: 'zh-CN', label: '中文（简体）' },
+]
+
 export default function SetupScreen() {
   const dispatch = useAppDispatch()
+  const state = useAppState()
   const t = useTranslation()
+
+  function handleLanguageChange(e) {
+    const lang = e.target.value
+    dispatch({ type: 'UPDATE_SETTINGS', payload: { language: lang } })
+    window.api.settings.save({ language: lang })
+  }
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -45,7 +67,7 @@ export default function SetupScreen() {
 
   return (
     <div className="setup-screen">
-      <div className="setup-card">
+      <div className="setup-card" style={{ position: 'relative' }}>
         <img src={logoUrl} alt="Kumo" className="setup-card__logo" />
 
         <h1 className="setup-card__title">Kumo</h1>
@@ -110,6 +132,22 @@ export default function SetupScreen() {
             </button>
           </p>
         </form>
+
+        <select
+          value={state.settings.language || 'en-US'}
+          onChange={handleLanguageChange}
+          style={{
+            position: 'absolute', bottom: 'var(--sp-4)', right: 'var(--sp-4)',
+            background: 'none', border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)', color: 'var(--text-tertiary)',
+            fontSize: 'var(--text-xs)', padding: '2px var(--sp-2)',
+            cursor: 'pointer', appearance: 'none', outline: 'none'
+          }}
+        >
+          {SETUP_LANGUAGES.map(l => (
+            <option key={l.code} value={l.code}>{l.label}</option>
+          ))}
+        </select>
       </div>
     </div>
   )

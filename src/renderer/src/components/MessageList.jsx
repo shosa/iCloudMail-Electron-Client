@@ -97,6 +97,17 @@ export default function MessageList() {
   // Clear multi-selection and reset filters when folder changes
   useEffect(() => { setSelectedKeys(new Set()); setFilter('all'); setSortBy('date-desc') }, [folder])
 
+  // Auto-select message when opened from a notification click
+  useEffect(() => {
+    const uid = state.messages.pendingNotifUid
+    if (!uid || !state.messages.list.length) return
+    const target = state.messages.list.find(m => m.uid === uid && m.folder === folder)
+    if (target) {
+      selectSingle(target)
+      dispatch({ type: 'CLEAR_NOTIF_TARGET' })
+    }
+  }, [state.messages.list, state.messages.pendingNotifUid, folder])
+
   // Ctrl+A selects all visible messages
   useEffect(() => {
     function onKeyDown(e) {

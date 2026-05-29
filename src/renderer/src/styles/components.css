@@ -1761,6 +1761,7 @@
 /* ── Sidebar nav tabs ────────────────────────────────────────────────────── */
 
 .sidebar__nav-tabs {
+  position: relative;
   display: flex;
   margin: var(--sp-1) var(--sp-3) var(--sp-1);
   padding: 3px;
@@ -1768,6 +1769,21 @@
   background: rgba(0, 0, 0, 0.22);
   border-radius: var(--radius-full);
   flex-shrink: 0;
+}
+
+/* Sliding pill indicator */
+.sidebar__nav-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 8px) / 3);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  will-change: transform;
 }
 
 .sidebar__nav-tab {
@@ -1783,24 +1799,33 @@
   color: var(--text-secondary);
   font-family: var(--font-sans);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-default);
+  transition: color var(--duration-fast) var(--ease-default);
   user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar__nav-tab svg {
+  transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              color var(--duration-fast) var(--ease-default);
 }
 
 .sidebar__nav-tab:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar__nav-tab:active svg {
+  transform: scale(0.88);
 }
 
 .sidebar__nav-tab.active {
   color: var(--text-primary);
   font-weight: var(--weight-semibold);
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 .sidebar__nav-tab.active svg {
   color: var(--accent);
+  transform: scale(1.12);
 }
 
 /* ── Spin animation (used by Toolbar sync) ──────────────────────────────── */
@@ -2317,19 +2342,21 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
+.theme-light .sidebar__nav-indicator {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
 .theme-light .sidebar__nav-tab {
   color: rgba(0, 0, 0, 0.45);
 }
 
 .theme-light .sidebar__nav-tab:hover {
   color: rgba(0, 0, 0, 0.75);
-  background: rgba(0, 0, 0, 0.06);
 }
 
 .theme-light .sidebar__nav-tab.active {
   color: rgba(0, 0, 0, 0.85);
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .theme-light .contact-row:hover,

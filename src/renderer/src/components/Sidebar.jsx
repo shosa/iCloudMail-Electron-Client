@@ -310,6 +310,10 @@ export default function Sidebar() {
       </div>
 
       <div className="sidebar__nav-tabs">
+        <span
+          className="sidebar__nav-indicator"
+          style={{ transform: `translateX(calc(${({ mail: 0, contacts: 1, calendar: 2 }[state.view || 'mail'] ?? 0)} * (100% + 1px)))` }}
+        />
         <button
           className={`sidebar__nav-tab${state.view === 'mail' || !state.view ? ' active' : ''}`}
           onClick={() => dispatch({ type: 'SET_VIEW', payload: 'mail' })}

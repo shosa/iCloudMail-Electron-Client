@@ -151,14 +151,18 @@ function createTray() {
 }
 
 const TRAY_STRINGS = {
-  en: { open: 'Open Kumo', openUnread: n => `Open — ${n} unread`, checkMail: 'Check Mail', quit: 'Quit' },
-  it: { open: 'Apri Kumo', openUnread: n => `Apri — ${n} non letti`, checkMail: 'Controlla posta', quit: 'Esci' },
-  fr: { open: 'Ouvrir Kumo', openUnread: n => `Ouvrir — ${n} non lus`, checkMail: 'Vérifier le courrier', quit: 'Quitter' },
-  de: { open: 'Kumo öffnen', openUnread: n => `Öffnen — ${n} ungelesen`, checkMail: 'E-Mails abrufen', quit: 'Beenden' },
-  es: { open: 'Abrir Kumo', openUnread: n => `Abrir — ${n} sin leer`, checkMail: 'Revisar correo', quit: 'Salir' },
-  ru: { open: 'Открыть Kumo', openUnread: n => `Открыть — ${n} непрочитанных`, checkMail: 'Проверить почту', quit: 'Выйти' },
-  jp: { open: 'Kumoを開く', openUnread: n => `開く — ${n}件の未読`, checkMail: 'メールを確認', quit: '終了' },
-  cn: { open: '打开 Kumo', openUnread: n => `打开 — ${n} 封未读`, checkMail: '检查邮件', quit: '退出' }
+  'en-US': { open: 'Open Kumo', openUnread: n => `Open — ${n} unread`, checkMail: 'Check Mail', quit: 'Quit' },
+  'it-IT': { open: 'Apri Kumo', openUnread: n => `Apri — ${n} non letti`, checkMail: 'Controlla posta', quit: 'Esci' },
+  'fr-FR': { open: 'Ouvrir Kumo', openUnread: n => `Ouvrir — ${n} non lus`, checkMail: 'Vérifier le courrier', quit: 'Quitter' },
+  'de-DE': { open: 'Kumo öffnen', openUnread: n => `Öffnen — ${n} ungelesen`, checkMail: 'E-Mails abrufen', quit: 'Beenden' },
+  'es-ES': { open: 'Abrir Kumo', openUnread: n => `Abrir — ${n} sin leer`, checkMail: 'Revisar correo', quit: 'Salir' },
+  'pt-BR': { open: 'Abrir Kumo', openUnread: n => `Abrir — ${n} não lidos`, checkMail: 'Verificar e-mail', quit: 'Sair' },
+  'nl-NL': { open: 'Kumo openen', openUnread: n => `Openen — ${n} ongelezen`, checkMail: 'E-mail controleren', quit: 'Afsluiten' },
+  'ru-RU': { open: 'Открыть Kumo', openUnread: n => `Открыть — ${n} непрочитанных`, checkMail: 'Проверить почту', quit: 'Выйти' },
+  'tr-TR': { open: "Kumo'yu Aç", openUnread: n => `Aç — ${n} okunmamış`, checkMail: 'Postaları Kontrol Et', quit: 'Çıkış' },
+  'ko-KR': { open: 'Kumo 열기', openUnread: n => `열기 — ${n}개 읽지 않음`, checkMail: '메일 확인', quit: '종료' },
+  'ja-JP': { open: 'Kumoを開く', openUnread: n => `開く — ${n}件の未読`, checkMail: 'メールを確認', quit: '終了' },
+  'zh-CN': { open: '打开 Kumo', openUnread: n => `打开 — ${n} 封未读`, checkMail: '检查邮件', quit: '退出' },
 }
 
 function updateTrayMenu() {
@@ -167,9 +171,11 @@ function updateTrayMenu() {
   const badge = totalUnread > 0 ? ` (${totalUnread})` : ''
   tray.setToolTip(`Kumo${badge}`)
 
-  let lang = 'en'
-  try { lang = getSettings().language || 'en' } catch { /* use default */ }
-  const s = TRAY_STRINGS[lang] || TRAY_STRINGS.en
+  const LANG_ALIASES = { en: 'en-US', it: 'it-IT', fr: 'fr-FR', de: 'de-DE', jp: 'ja-JP', es: 'es-ES', ru: 'ru-RU', cn: 'zh-CN' }
+  let raw = 'en-US'
+  try { raw = getSettings().language || 'en-US' } catch { /* use default */ }
+  const lang = LANG_ALIASES[raw] || raw
+  const s = TRAY_STRINGS[lang] || TRAY_STRINGS['en-US']
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -233,33 +239,33 @@ function _makeAvatarIcon(from) {
   const s = 0.60, l = 0.45
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s
   const p = 2 * l - q
-  const hue2rgb = (t) => {
+  const hue2rgb = t => {
     if (t < 0) t += 1; if (t > 1) t -= 1
-    if (t < 1 / 6) return p + (q - p) * 6 * t
-    if (t < 1 / 2) return q
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    if (t < 1/6) return p + (q-p)*6*t
+    if (t < 1/2) return q
+    if (t < 2/3) return p + (q-p)*(2/3-t)*6
     return p
   }
-  const r = Math.round(hue2rgb(h + 1 / 3) * 255)
-  const g = Math.round(hue2rgb(h) * 255)
-  const b = Math.round(hue2rgb(h - 1 / 3) * 255)
+  const r = Math.round(hue2rgb(h+1/3)*255)
+  const g = Math.round(hue2rgb(h)*255)
+  const b = Math.round(hue2rgb(h-1/3)*255)
   const size = 64
   const buf = Buffer.alloc(size * size * 4)
-  const cx = size / 2 - 0.5, cy = size / 2 - 0.5, radius = size / 2 - 2
+  const cx = size/2-0.5, cy = size/2-0.5, radius = size/2-2
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-      const alpha = Math.max(0, Math.min(1, radius + 1 - dist)) * 255
+      const dist = Math.sqrt((x-cx)**2+(y-cy)**2)
+      const alpha = Math.max(0, Math.min(1, radius+1-dist))*255
       if (alpha > 0) {
-        const idx = (y * size + x) * 4
-        buf[idx] = r; buf[idx + 1] = g; buf[idx + 2] = b; buf[idx + 3] = Math.round(alpha)
+        const idx = (y*size+x)*4
+        buf[idx]=r; buf[idx+1]=g; buf[idx+2]=b; buf[idx+3]=Math.round(alpha)
       }
     }
   }
   return nativeImage.createFromBuffer(buf, { width: size, height: size })
 }
 
-function showNewMailNotification(subject, from, folder) {
+function showNewMailNotification(subject, from, folder, uid) {
   try {
     const settings = getSettings()
     if (!settings.notificationsEnabled) return
@@ -267,23 +273,22 @@ function showNewMailNotification(subject, from, folder) {
     if (!notifyFolders.includes(folder)) return
   } catch { /* proceed anyway if settings unavailable */ }
 
-  if (Notification.isSupported()) {
-    try {
-      const icon = _makeAvatarIcon(from)
-      const n = new Notification({
-        title: from || 'New Mail',
-        body: subject || '(no subject)',
-        icon,
-        silent: false
-      })
-      n.on('click', () => {
-        mainWindow?.show()
-        mainWindow?.focus()
-        mainWindow?.webContents.send('imap:notification-click', { folder })
-      })
-      n.show()
-    } catch { /* Notification construction failed */ }
-  }
+  if (!Notification.isSupported()) return
+  try {
+    const icon = _makeAvatarIcon(from)
+    const n = new Notification({
+      title: 'Nuovo Messaggio',
+      body: `Da: ${from || '?'}\n${subject || '(nessun oggetto)'}`,
+      icon,
+      silent: false
+    })
+    n.on('click', () => {
+      mainWindow?.show()
+      mainWindow?.focus()
+      mainWindow?.webContents.send('imap:notification-click', { folder, uid })
+    })
+    n.show()
+  } catch { /* Notification construction failed */ }
 }
 
 function _attachClientEvents(email, client) {
@@ -293,7 +298,7 @@ function _attachClientEvents(email, client) {
     const cur = unreadCounts.get(email) || 0
     unreadCounts.set(email, cur + 1)
     updateTrayMenu()
-    showNewMailNotification(subject, from, folder)
+    showNewMailNotification(subject, from, folder, uid)
     mainWindow?.webContents.send('imap:new-mail', { subject, from, folder, uid, account: email })
   })
   client.on('connection-status', (status) => {

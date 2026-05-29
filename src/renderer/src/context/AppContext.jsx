@@ -22,7 +22,8 @@ const initialState = {
     page: 1,
     total: 0,
     searchQuery: '',
-    searchResults: null
+    searchResults: null,
+    pendingNotifUid: null
   },
   compose: {
     isOpen: false,
@@ -38,7 +39,7 @@ const initialState = {
     syncInterval: 5,
     signature: '',
     notifyFolders: ['INBOX'],
-    language: 'en'
+    language: 'en-US'
   },
   view: 'mail',        // 'mail' | 'contacts' | 'calendar'
   contacts: {
@@ -90,6 +91,14 @@ function reducer(state, action) {
       )
       return { ...state, folders: { ...state.folders, list } }
     }
+    case 'NOTIF_OPEN_MAIL':
+      return {
+        ...state,
+        folders: { ...state.folders, selected: action.payload.folder },
+        messages: { ...state.messages, list: [], page: 1, selected: null, searchQuery: '', searchResults: null, pendingNotifUid: action.payload.uid }
+      }
+    case 'CLEAR_NOTIF_TARGET':
+      return { ...state, messages: { ...state.messages, pendingNotifUid: null } }
 
     // Messages
     case 'SET_MESSAGES':

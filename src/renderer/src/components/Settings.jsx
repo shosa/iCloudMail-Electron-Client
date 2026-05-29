@@ -152,14 +152,18 @@ export default function Settings() {
                 <div className="settings-row__label">{t('settings.languageLabel')}</div>
               </div>
               <select className="settings-select" value={local.language} onChange={e => update('language', e.target.value)}>
-                <option value="en">English</option>
-                <option value="it">Italiano</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="jp">日本語</option>
-                <option value="es">Español</option>
-                <option value="ru">Русский</option>
-                <option value="cn">中文（简体）</option>
+                <option value="en-US">English</option>
+                <option value="it-IT">Italiano</option>
+                <option value="fr-FR">Français</option>
+                <option value="de-DE">Deutsch</option>
+                <option value="es-ES">Español</option>
+                <option value="pt-BR">Português (Brasil)</option>
+                <option value="nl-NL">Nederlands</option>
+                <option value="ru-RU">Русский</option>
+                <option value="tr-TR">Türkçe</option>
+                <option value="ko-KR">한국어</option>
+                <option value="ja-JP">日本語</option>
+                <option value="zh-CN">中文（简体）</option>
               </select>
             </div>
           </div>
