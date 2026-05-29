@@ -142,6 +142,27 @@
   background: var(--accent-subtle);
 }
 
+/* Ghost button — icon only, keeps border and background */
+.btn--ghost-icon {
+  padding: 6px;
+  min-width: 32px;
+  height: 32px;
+  transition: background var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+.btn--ghost-icon:hover {
+  background: var(--glass-fill-active);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+.btn--ghost-icon:active {
+  background: var(--accent-subtle);
+  transform: scale(0.95);
+}
+
 .btn--danger {
   background: rgba(255, 69, 58, 0.15);
   color: var(--color-error);
@@ -1390,6 +1411,7 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   min-height: 80px;
+  overflow: hidden;
 }
 .tiptap-editor.settings-signature-editor .ProseMirror {
   padding: var(--sp-3);
@@ -1400,6 +1422,42 @@
 .tiptap-editor.settings-signature-editor:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.settings-sig-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-fill-hover);
+}
+.settings-sig-toolbar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default);
+}
+.settings-sig-toolbar__btn:hover {
+  background: var(--glass-fill-active);
+  color: var(--text-primary);
+}
+.settings-sig-toolbar__btn.is-active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.settings-sig-toolbar__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--glass-border);
+  margin: 0 2px;
 }
 
 .settings-panel__footer {

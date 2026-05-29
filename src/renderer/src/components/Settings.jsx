@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
-import { IconClose, IconSignOut, IconLanguage, IconClearCache } from './Icons'
+import { IconClose, IconSignOut, IconLanguage, IconClearCache, IconTrash, IconCheck, IconFolderOpen, IconBold, IconItalic, IconUnderlineF } from './Icons'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -53,6 +53,7 @@ export default function Settings() {
       setLocal(s => ({ ...s, signature: editor.getHTML() }))
     }
   })
+
 
   function handleDensityChange(density) {
     setLocal(s => ({ ...s, displayDensity: density }))
@@ -215,6 +216,25 @@ export default function Settings() {
             <div className="settings-section__title">{t('settings.signature')}</div>
             <div className="settings-section__label">{t('settings.signatureLabel')}</div>
             <div className="tiptap-editor settings-signature-editor">
+              {sigEditor && (
+                <div className="settings-sig-toolbar">
+                  <button
+                    className={`settings-sig-toolbar__btn${sigEditor.isActive('bold') ? ' is-active' : ''}`}
+                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleBold().run() }}
+                    title="Bold"
+                  ><IconBold size={16} /></button>
+                  <button
+                    className={`settings-sig-toolbar__btn${sigEditor.isActive('italic') ? ' is-active' : ''}`}
+                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleItalic().run() }}
+                    title="Italic"
+                  ><IconItalic size={16} /></button>
+                  <button
+                    className={`settings-sig-toolbar__btn${sigEditor.isActive('underline') ? ' is-active' : ''}`}
+                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleUnderline().run() }}
+                    title="Underline"
+                  ><IconUnderlineF size={16} /></button>
+                </div>
+              )}
               {sigEditor && <EditorContent editor={sigEditor} />}
             </div>
           </div>
@@ -283,10 +303,11 @@ export default function Settings() {
                   <div className="settings-row__desc" style={{ wordBreak: 'break-all', userSelect: 'text' }}>{dbPath}</div>
                 </div>
                 <button
-                  className="btn btn--ghost"
+                  className="btn btn--ghost btn--ghost-icon"
                   onClick={() => window.api.store.openDbFolder()}
+                  title={t('settings.openFolder')}
                   style={{ flexShrink: 0 }}
-                >{t('settings.openFolder')}</button>
+                ><IconFolderOpen size={15} /></button>
               </div>
             )}
 
@@ -295,10 +316,10 @@ export default function Settings() {
                 <div className="settings-row__label">{t('settings.clearCache')}</div>
                 <div className="settings-row__desc">{t('settings.clearCacheDesc')}</div>
               </div>
-              <button className="btn btn--ghost" onClick={handleClearCache} disabled={clearingCache} style={{ flexShrink: 0 }}>
+              <button className="btn btn--ghost btn--ghost-icon" onClick={handleClearCache} disabled={clearingCache} title={t('settings.clearCache')} style={{ flexShrink: 0 }}>
                 {clearingCache ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                  : cacheCleared ? t('settings.clearCacheSuccess')
-                  : <><IconClearCache size={15} /> {t('settings.clearCache')}</>}
+                  : cacheCleared ? <IconCheck size={15} style={{ color: 'var(--color-success)' }} />
+                  : <IconClearCache size={15} />}
               </button>
             </div>
 
@@ -307,10 +328,10 @@ export default function Settings() {
                 <div className="settings-row__label">{t('settings.clearFolderCache')}</div>
                 <div className="settings-row__desc">{t('settings.clearFolderCacheDesc')}</div>
               </div>
-              <button className="btn btn--ghost" onClick={handleClearFolderCache} disabled={clearingFolders} style={{ flexShrink: 0 }}>
+              <button className="btn btn--ghost btn--ghost-icon" onClick={handleClearFolderCache} disabled={clearingFolders} title={t('settings.clearFolderCache')} style={{ flexShrink: 0 }}>
                 {clearingFolders ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                  : foldersCleared ? t('settings.clearCacheSuccess')
-                  : <><IconClearCache size={15} /> {t('settings.clearFolderCache')}</>}
+                  : foldersCleared ? <IconCheck size={15} style={{ color: 'var(--color-success)' }} />
+                  : <IconClearCache size={15} />}
               </button>
             </div>
 
@@ -319,10 +340,10 @@ export default function Settings() {
                 <div className="settings-row__label">{t('settings.clearContacts')}</div>
                 <div className="settings-row__desc">{t('settings.clearContactsDesc')}</div>
               </div>
-              <button className="btn btn--ghost" onClick={handleClearContacts} disabled={clearingContacts} style={{ flexShrink: 0 }}>
+              <button className="btn btn--ghost btn--ghost-icon" onClick={handleClearContacts} disabled={clearingContacts} title={t('settings.clearContacts')} style={{ flexShrink: 0 }}>
                 {clearingContacts ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                  : contactsCleared ? t('settings.clearContactsSuccess')
-                  : <><IconClearCache size={15} /> {t('settings.clearContacts')}</>}
+                  : contactsCleared ? <IconCheck size={15} style={{ color: 'var(--color-success)' }} />
+                  : <IconClearCache size={15} />}
               </button>
             </div>
 
@@ -331,10 +352,10 @@ export default function Settings() {
                 <div className="settings-row__label">{t('settings.clearCalendar')}</div>
                 <div className="settings-row__desc">{t('settings.clearCalendarDesc')}</div>
               </div>
-              <button className="btn btn--ghost" onClick={handleClearCalendar} disabled={clearingCalendar} style={{ flexShrink: 0 }}>
+              <button className="btn btn--ghost btn--ghost-icon" onClick={handleClearCalendar} disabled={clearingCalendar} title={t('settings.clearCalendar')} style={{ flexShrink: 0 }}>
                 {clearingCalendar ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                  : calendarCleared ? t('settings.clearCalendarSuccess')
-                  : <><IconClearCache size={15} /> {t('settings.clearCalendar')}</>}
+                  : calendarCleared ? <IconCheck size={15} style={{ color: 'var(--color-success)' }} />
+                  : <IconClearCache size={15} />}
               </button>
             </div>
 
@@ -344,15 +365,14 @@ export default function Settings() {
                 <div className="settings-row__desc">{t('settings.resetDataDesc')}</div>
               </div>
               <button
-                className={`btn ${confirmReset ? 'btn--danger' : 'btn--ghost'}`}
+                className={`btn btn--ghost-icon ${confirmReset ? 'btn--danger' : 'btn--ghost'}`}
                 onClick={handleResetAllData}
                 disabled={resetting}
+                title={confirmReset ? t('settings.resetDataConfirm') : t('settings.resetData')}
                 style={{ flexShrink: 0 }}
                 onBlur={() => setConfirmReset(false)}
               >
-                {resetting ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                  : confirmReset ? t('settings.resetDataConfirm')
-                  : t('settings.resetData')}
+                {resetting ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <IconTrash size={15} />}
               </button>
             </div>
           </div>

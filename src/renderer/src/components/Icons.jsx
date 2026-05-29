@@ -67,3 +67,6 @@ export const IconSync       = p => <SvgIcon {...p} d="M4 4v5h.582m15.356 2A8.001
 export const IconClock      = p => <SvgIcon {...p} d={["M12 8v4l3 3", "M21 12a9 9 0 11-18 0 9 9 0 0118 0"]} />
 export const IconPin        = p => <SvgIcon {...p} d="M5.05 4.05a7 7 0 119.9 9.9L10 18l-4.95-4.95a7 7 0 010-9.9z" />
 export const IconResize     = p => <SvgIcon {...p} d={["M15 3h6v6", "M9 21H3v-6", "M21 3l-7 7", "M3 21l7-7"]} />
+export const IconCheck      = p => <SvgIcon {...p} d="M5 13l4 4L19 7" />
+export const IconFolderOpen = p => <SvgIcon {...p} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+export const IconLink       = p => <SvgIcon {...p} d={["M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"]} />

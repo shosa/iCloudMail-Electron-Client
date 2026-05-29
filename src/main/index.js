@@ -36,10 +36,9 @@ const viewerDataStore = new Map()
 
 function getResourcePath(filename) {
   if (process.env.ELECTRON_RENDERER_URL) {
-    // dev: app.getAppPath() is the project root
     return join(app.getAppPath(), 'resources', filename)
   }
-  return join(process.resourcesPath, filename)
+  return join(process.resourcesPath, 'resources', filename)
 }
 
 function _attachExternalLinkHandler(win) {
