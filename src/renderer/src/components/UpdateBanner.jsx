@@ -19,7 +19,7 @@ export default function UpdateModal() {
         setPreparing(false)
       }
       setDismissed(false)
-      setStatus(data)
+      setStatus(prev => ({ ...prev, ...data }))
     })
     return () => off?.()
   }, [])
