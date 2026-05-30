@@ -454,7 +454,16 @@ export default function MessageList() {
 function MessageItem({ message, selected, multiSelected, threadCount, isThreadChild, onThreadExpand, onClick, onDoubleClick, onContextMenu, onDragStart, onQuickAction, contactMap }) {
   const isUnread  = !message.flags?.includes('\\Seen')
   const isStarred = message.flags?.includes('\\Flagged')
-  const resolvedName = contactMap?.get(message.from_email?.toLowerCase()) || message.from_name || message.from_email || '?'
+  const isSentFolder = /sent|draft|outbox/i.test(message.folder || '')
+  const resolvedName = (() => {
+    if (isSentFolder) {
+      const to = message.to_addresses
+      const arr = Array.isArray(to) ? to : (typeof to === 'string' ? (() => { try { return JSON.parse(to) } catch { return [] } })() : [])
+      const first = arr[0]
+      if (first) return (typeof first === 'object' ? (first.name || first.email) : String(first)) || '?'
+    }
+    return contactMap?.get(message.from_email?.toLowerCase()) || message.from_name || message.from_email || '?'
+  })()
   const initials  = getInitials(resolvedName, message.from_email)
   const color     = getAvatarColor(resolvedName)
 

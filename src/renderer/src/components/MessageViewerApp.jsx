@@ -14,19 +14,20 @@ function getAvatarColor(name) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-function AddressChip({ address, large }) {
+function AddressChip({ address, large, noCompose }) {
   const a = typeof address === 'string' ? { email: address, name: '' } : (address || {})
   const email = a.email || ''
   const color = getAvatarColor(a.name || email)
   const ini = getInitials(a.name, email)
   return (
     <div
-      className={`address-chip${large ? ' address-chip--large' : ''}`}
+      className={`address-chip${large ? ' address-chip--large' : ''}${noCompose ? ' address-chip--self' : ''}`}
       title={email}
-      onClick={() => window.api.window.openCompose({ mode: 'new', to: email })}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && window.api.window.openCompose({ mode: 'new', to: email })}
+      onClick={noCompose ? undefined : () => window.api.window.openCompose({ mode: 'new', to: email })}
+      role={noCompose ? undefined : 'button'}
+      tabIndex={noCompose ? -1 : 0}
+      onKeyDown={noCompose ? undefined : e => e.key === 'Enter' && window.api.window.openCompose({ mode: 'new', to: email })}
+      style={noCompose ? { cursor: 'default', pointerEvents: 'none' } : undefined}
     >
       <div className="address-chip__avatar" style={{ background: color }}>{ini}</div>
       <span className="address-chip__name">{a.name || email}</span>
@@ -67,7 +68,7 @@ function buildSafeHTML(html, blockImages) {
 export default function MessageViewerApp({ message }) {
   const [body, setBody] = useState(null)
   const [bodyLoading, setBodyLoading] = useState(false)
-  const [settings, setSettings] = useState({ theme: 'light', blockRemoteImages: true, language: 'en' })
+  const [settings, setSettings] = useState({ theme: 'light', blockRemoteImages: true, language: 'en-US' })
   const [flags, setFlags] = useState(message?.flags || [])
   const [imagesBlocked, setImagesBlocked] = useState(true)
   const [imagesLoadedByUser, setImagesLoadedByUser] = useState(false)
@@ -96,8 +97,8 @@ export default function MessageViewerApp({ message }) {
     return <div className={`app-root theme-light`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>No message data</div>
   }
 
-  const locale = locales[settings.language] || locales.en
-  const t = (key) => locale[key] ?? locales.en[key] ?? key
+  const locale = locales[settings.language] || locales['en-US']
+  const t = (key) => (locale || locales['en-US'])[key] ?? key
 
   const isRead    = flags.includes('\\Seen')
   const isStarred = flags.includes('\\Flagged')
@@ -236,7 +237,8 @@ export default function MessageViewerApp({ message }) {
             <div className="viewer__recipients">
               <span className="viewer__recipients-label">{t('reading.from')}</span>
               <div className="viewer__chips">
-                <AddressChip address={{ name: message.from_name, email: message.from_email }} large />
+                <AddressChip address={{ name: message.from_name, email: message.from_email }} large
+                  noCompose={message.from_email?.toLowerCase() === message.account_email?.toLowerCase()} />
               </div>
             </div>
             {(message.to_addresses?.length > 0) && (
@@ -244,7 +246,8 @@ export default function MessageViewerApp({ message }) {
                 <span className="viewer__recipients-label">{t('reading.to')}</span>
                 <div className="viewer__chips">
                   {(message.to_addresses || []).map((a, i) => (
-                    <AddressChip key={i} address={a} />
+                    <AddressChip key={i} address={a}
+                      noCompose={(a?.email || a)?.toLowerCase() === message.account_email?.toLowerCase()} />
                   ))}
                 </div>
               </div>

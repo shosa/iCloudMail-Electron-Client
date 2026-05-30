@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
-import { IconClose, IconSignOut, IconLanguage, IconClearCache, IconTrash, IconCheck, IconFolderOpen, IconBold, IconItalic, IconUnderlineF } from './Icons'
+import { IconClose, IconSignOut, IconClearCache, IconTrash, IconCheck, IconFolderOpen, IconBold, IconItalic, IconUnderlineF } from './Icons'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -13,6 +13,54 @@ function Toggle({ checked, onChange }) {
       <span className="toggle__track" />
       <span className="toggle__thumb" />
     </label>
+  )
+}
+
+function SunIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+    </svg>
+  )
+}
+
+function SystemIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+  )
+}
+
+function SegmentedControl({ options, value, onChange }) {
+  const idx = Math.max(0, options.findIndex(o => o.value === value))
+  return (
+    <div className="segmented-ctrl" style={{ '--cols': options.length, '--idx': idx }}>
+      <div className="segmented-ctrl__pill" />
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          type="button"
+          className={`segmented-ctrl__btn${value === opt.value ? ' is-active' : ''}`}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.icon && opt.icon}
+          {opt.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -242,53 +290,48 @@ export default function Settings() {
           {/* Display Density */}
           <div className="settings-section">
             <div className="settings-section__title">{t('settings.display')}</div>
-            <div className="settings-section">
-              <div className="settings-section__label">{t('settings.displayDensity')}</div>
-              <div className="settings-radio-group">
-                {['compact', 'comfortable', 'spacious'].map(d => (
-                  <label key={d} className="settings-radio">
-                    <input
-                      type="radio"
-                      name="density"
-                      value={d}
-                      checked={(local.displayDensity || 'comfortable') === d}
-                      onChange={() => handleDensityChange(d)}
-                    />
-                    {t(`settings.density.${d}`)}
-                  </label>
-                ))}
+
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <div className="settings-row__label">{t('settings.displayDensity')}</div>
               </div>
+              <SegmentedControl
+                value={local.displayDensity || 'comfortable'}
+                onChange={handleDensityChange}
+                options={[
+                  { value: 'compact',     label: t('settings.density.compact') },
+                  { value: 'comfortable', label: t('settings.density.comfortable') },
+                  { value: 'spacious',    label: t('settings.density.spacious') },
+                ]}
+              />
             </div>
-            <div className="settings-section">
-              <div className="settings-section__label">{t('settings.theme')}</div>
-              <div className="settings-radio-group">
-                {[['light', 'settings.themeLight'], ['dark', 'settings.themeDark'], ['system', 'settings.themeSystem']].map(([themeVal, labelKey]) => (
-                  <label key={themeVal} className="settings-radio">
-                    <input
-                      type="radio"
-                      name="theme"
-                      value={themeVal}
-                      checked={(local.theme || 'light') === themeVal}
-                      onChange={() => {
-                        setLocal(s => ({ ...s, theme: themeVal }))
-                        dispatch({ type: 'UPDATE_SETTINGS', payload: { theme: themeVal } })
-                      }}
-                    />
-                    {t(labelKey)}
-                  </label>
-                ))}
+
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <div className="settings-row__label">{t('settings.theme')}</div>
               </div>
+              <SegmentedControl
+                value={local.theme || 'light'}
+                onChange={themeVal => {
+                  setLocal(s => ({ ...s, theme: themeVal }))
+                  dispatch({ type: 'UPDATE_SETTINGS', payload: { theme: themeVal } })
+                }}
+                options={[
+                  { value: 'light',  label: t('settings.themeLight'),  icon: <SunIcon /> },
+                  { value: 'dark',   label: t('settings.themeDark'),   icon: <MoonIcon /> },
+                  { value: 'system', label: t('settings.themeSystem'), icon: <SystemIcon /> },
+                ]}
+              />
             </div>
-            <div className="settings-section">
-              <div className="settings-section__label">{t('settings.notifications')}</div>
-              <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={!!local.notificationsEnabled}
-                  onChange={e => { setLocal(s => ({ ...s, notificationsEnabled: e.target.checked })); setSaved(false) }}
-                />
-                {t('settings.notificationsEnabled')}
-              </label>
+
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <div className="settings-row__label">{t('settings.notificationsEnabled')}</div>
+              </div>
+              <Toggle
+                checked={!!local.notificationsEnabled}
+                onChange={v => { setLocal(s => ({ ...s, notificationsEnabled: v })); setSaved(false) }}
+              />
             </div>
           </div>
 

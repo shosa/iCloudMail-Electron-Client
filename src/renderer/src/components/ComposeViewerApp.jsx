@@ -110,7 +110,7 @@ function RecipientField({ label, value, onChange, placeholder, trailing, contact
 export default function ComposeViewerApp({ composeData }) {
   const { mode = 'new', message: msg, body, to: initialTo = '' } = composeData || {}
 
-  const [settings, setSettings] = useState({ theme: 'light', signature: '', language: 'en' })
+  const [settings, setSettings] = useState({ theme: 'light', signature: '', language: 'en-US' })
   const [contacts, setContacts] = useState([])
   const [accountEmail, setAccountEmail] = useState('')
   const [to, setTo] = useState(initialTo || (msg && mode !== 'new' ? buildReplyTo(mode, msg, '') : ''))
@@ -280,8 +280,8 @@ export default function ComposeViewerApp({ composeData }) {
     window.close()
   }
 
-  const locale = locales[settings.language] || locales.en
-  const t = (key) => locale[key] ?? locales.en[key] ?? key
+  const locale = locales[settings.language] || locales['en-US']
+  const t = (key) => (locale || locales['en-US'])[key] ?? key
 
   const windowTitle = (() => {
     if (mode === 'new') return t('compose.title.new')
