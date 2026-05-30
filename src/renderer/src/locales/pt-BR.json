@@ -175,9 +175,15 @@
   "setup.error.connection": "Não foi possível conectar. Verifique seu e-mail e senha.",
   "setup.error.save": "Conectado, mas não foi possível salvar as credenciais. Tente novamente.",
   "update.available": "Kumo {0} está disponível",
+  "update.availableDesc": "Uma nova versão do Kumo está pronta para download.",
   "update.download": "Baixar",
   "update.later": "Depois",
+  "update.preparing": "Preparando download…",
   "update.downloading": "Baixando… {0}%",
+  "update.downloadComplete": "Download concluído",
   "update.ready": "Kumo {0} pronto para instalar",
-  "update.restart": "Reiniciar e Atualizar"
+  "update.readyDesc": "Reinicie o Kumo para aplicar a atualização.",
+  "update.restart": "Reiniciar e Atualizar",
+  "update.errorTitle": "Falha na atualização",
+  "update.errorUnknown": "Ocorreu um erro desconhecido."
 }

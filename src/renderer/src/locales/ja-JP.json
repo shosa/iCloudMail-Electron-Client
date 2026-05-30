@@ -175,9 +175,15 @@
   "setup.error.connection": "接続できませんでした。メールアドレスとパスワードをご確認ください。",
   "setup.error.save": "接続に成功しましたが、認証情報を保存できませんでした。もう一度お試しください。",
   "update.available": "Kumo {0} が利用可能です",
+  "update.availableDesc": "新しいバージョンのKumoをダウンロードする準備ができています。",
   "update.download": "ダウンロード",
   "update.later": "後で",
+  "update.preparing": "ダウンロードを準備中…",
   "update.downloading": "ダウンロード中… {0}%",
+  "update.downloadComplete": "ダウンロード完了",
   "update.ready": "Kumo {0} インストール準備完了",
-  "update.restart": "再起動してアップデート"
+  "update.readyDesc": "アップデートを適用するにはKumoを再起動してください。",
+  "update.restart": "再起動してアップデート",
+  "update.errorTitle": "アップデート失敗",
+  "update.errorUnknown": "不明なエラーが発生しました。"
 }

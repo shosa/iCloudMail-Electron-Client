@@ -175,9 +175,15 @@
   "setup.error.connection": "Couldn't connect. Double-check your email and password.",
   "setup.error.save": "Connected but couldn't save your credentials. Please try again.",
   "update.available": "Kumo {0} is available",
+  "update.availableDesc": "A new version of Kumo is ready to download.",
   "update.download": "Download",
   "update.later": "Later",
-  "update.downloading": "Downloading update… {0}%",
+  "update.preparing": "Preparing download…",
+  "update.downloading": "Downloading… {0}%",
+  "update.downloadComplete": "Download complete",
   "update.ready": "Kumo {0} ready to install",
-  "update.restart": "Restart & Update"
+  "update.readyDesc": "Restart Kumo to apply the update.",
+  "update.restart": "Restart & Update",
+  "update.errorTitle": "Update failed",
+  "update.errorUnknown": "An unknown error occurred."
 }

@@ -175,9 +175,15 @@
   "setup.error.connection": "Connexion impossible. Vérifiez votre adresse et votre mot de passe.",
   "setup.error.save": "Connecté mais impossible de sauvegarder les identifiants. Réessayez.",
   "update.available": "Kumo {0} est disponible",
+  "update.availableDesc": "Une nouvelle version de Kumo est prête à télécharger.",
   "update.download": "Télécharger",
   "update.later": "Plus tard",
+  "update.preparing": "Préparation du téléchargement…",
   "update.downloading": "Téléchargement… {0}%",
+  "update.downloadComplete": "Téléchargement terminé",
   "update.ready": "Kumo {0} prêt à installer",
-  "update.restart": "Redémarrer et Mettre à jour"
+  "update.readyDesc": "Redémarrez Kumo pour appliquer la mise à jour.",
+  "update.restart": "Redémarrer et Mettre à jour",
+  "update.errorTitle": "Échec de la mise à jour",
+  "update.errorUnknown": "Une erreur inconnue s'est produite."
 }

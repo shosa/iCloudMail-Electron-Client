@@ -175,9 +175,15 @@
   "setup.error.connection": "연결할 수 없습니다. 이메일과 비밀번호를 확인하세요.",
   "setup.error.save": "연결되었지만 자격 증명을 저장할 수 없습니다. 다시 시도하세요.",
   "update.available": "Kumo {0} 업데이트가 있습니다",
+  "update.availableDesc": "새 버전의 Kumo를 다운로드할 준비가 되었습니다.",
   "update.download": "다운로드",
   "update.later": "나중에",
+  "update.preparing": "다운로드 준비 중…",
   "update.downloading": "다운로드 중… {0}%",
+  "update.downloadComplete": "다운로드 완료",
   "update.ready": "Kumo {0} 설치 준비 완료",
-  "update.restart": "재시작 및 업데이트"
+  "update.readyDesc": "업데이트를 적용하려면 Kumo를 재시작하세요.",
+  "update.restart": "재시작 및 업데이트",
+  "update.errorTitle": "업데이트 실패",
+  "update.errorUnknown": "알 수 없는 오류가 발생했습니다."
 }

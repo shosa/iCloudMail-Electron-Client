@@ -175,9 +175,15 @@
   "setup.error.connection": "Kan geen verbinding maken. Controleer uw e-mailadres en wachtwoord.",
   "setup.error.save": "Verbonden maar kan aanmeldingsgegevens niet opslaan. Probeer het opnieuw.",
   "update.available": "Kumo {0} is beschikbaar",
+  "update.availableDesc": "Een nieuwe versie van Kumo is klaar om te downloaden.",
   "update.download": "Downloaden",
   "update.later": "Later",
+  "update.preparing": "Download voorbereiden…",
   "update.downloading": "Downloaden… {0}%",
+  "update.downloadComplete": "Download voltooid",
   "update.ready": "Kumo {0} klaar om te installeren",
-  "update.restart": "Herstarten en bijwerken"
+  "update.readyDesc": "Herstart Kumo om de update toe te passen.",
+  "update.restart": "Herstarten en bijwerken",
+  "update.errorTitle": "Update mislukt",
+  "update.errorUnknown": "Er is een onbekende fout opgetreden."
 }

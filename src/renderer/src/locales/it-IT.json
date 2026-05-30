@@ -175,9 +175,15 @@
   "setup.error.connection": "Connessione non riuscita. Controlla email e password.",
   "setup.error.save": "Connesso ma impossibile salvare le credenziali. Riprova.",
   "update.available": "Kumo {0} è disponibile",
+  "update.availableDesc": "Una nuova versione di Kumo è pronta per il download.",
   "update.download": "Scarica",
   "update.later": "Più tardi",
-  "update.downloading": "Download in corso… {0}%",
+  "update.preparing": "Preparazione download…",
+  "update.downloading": "Scaricamento… {0}%",
+  "update.downloadComplete": "Download completato",
   "update.ready": "Kumo {0} pronto all'installazione",
-  "update.restart": "Riavvia e Aggiorna"
+  "update.readyDesc": "Riavvia Kumo per applicare l'aggiornamento.",
+  "update.restart": "Riavvia e Aggiorna",
+  "update.errorTitle": "Aggiornamento fallito",
+  "update.errorUnknown": "Si è verificato un errore sconosciuto."
 }

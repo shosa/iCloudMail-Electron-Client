@@ -175,9 +175,15 @@
   "setup.error.connection": "Bağlanılamadı. E-posta ve şifrenizi kontrol edin.",
   "setup.error.save": "Bağlandı ancak kimlik bilgileri kaydedilemedi. Tekrar deneyin.",
   "update.available": "Kumo {0} kullanılabilir",
+  "update.availableDesc": "Kumo'nun yeni bir sürümü indirilmeye hazır.",
   "update.download": "İndir",
   "update.later": "Daha sonra",
+  "update.preparing": "İndirme hazırlanıyor…",
   "update.downloading": "İndiriliyor… {0}%",
+  "update.downloadComplete": "İndirme tamamlandı",
   "update.ready": "Kumo {0} kurulmaya hazır",
-  "update.restart": "Yeniden Başlat ve Güncelle"
+  "update.readyDesc": "Güncellemeyi uygulamak için Kumo'yu yeniden başlatın.",
+  "update.restart": "Yeniden Başlat ve Güncelle",
+  "update.errorTitle": "Güncelleme başarısız",
+  "update.errorUnknown": "Bilinmeyen bir hata oluştu."
 }

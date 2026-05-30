@@ -175,9 +175,15 @@
   "setup.error.connection": "Verbindung fehlgeschlagen. Überprüfe E-Mail und Passwort.",
   "setup.error.save": "Verbunden, aber Anmeldedaten konnten nicht gespeichert werden. Versuche es erneut.",
   "update.available": "Kumo {0} ist verfügbar",
+  "update.availableDesc": "Eine neue Version von Kumo steht zum Download bereit.",
   "update.download": "Herunterladen",
   "update.later": "Später",
-  "update.downloading": "Download läuft… {0}%",
+  "update.preparing": "Download wird vorbereitet…",
+  "update.downloading": "Herunterladen… {0}%",
+  "update.downloadComplete": "Download abgeschlossen",
   "update.ready": "Kumo {0} bereit zur Installation",
-  "update.restart": "Neu starten & Aktualisieren"
+  "update.readyDesc": "Starte Kumo neu, um das Update anzuwenden.",
+  "update.restart": "Neu starten & Aktualisieren",
+  "update.errorTitle": "Update fehlgeschlagen",
+  "update.errorUnknown": "Ein unbekannter Fehler ist aufgetreten."
 }

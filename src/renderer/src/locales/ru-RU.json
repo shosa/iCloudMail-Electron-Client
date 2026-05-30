@@ -175,9 +175,15 @@
   "setup.error.connection": "Не удалось подключиться. Проверьте email и пароль.",
   "setup.error.save": "Подключение успешно, но не удалось сохранить учётные данные. Попробуйте снова.",
   "update.available": "Kumo {0} доступен",
+  "update.availableDesc": "Новая версия Kumo готова к загрузке.",
   "update.download": "Скачать",
   "update.later": "Позже",
+  "update.preparing": "Подготовка загрузки…",
   "update.downloading": "Загрузка… {0}%",
+  "update.downloadComplete": "Загрузка завершена",
   "update.ready": "Kumo {0} готов к установке",
-  "update.restart": "Перезапустить и обновить"
+  "update.readyDesc": "Перезапустите Kumo, чтобы применить обновление.",
+  "update.restart": "Перезапустить и обновить",
+  "update.errorTitle": "Ошибка обновления",
+  "update.errorUnknown": "Произошла неизвестная ошибка."
 }
