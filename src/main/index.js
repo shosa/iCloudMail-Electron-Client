@@ -16,6 +16,8 @@ import { syncContacts, dumpRawContacts } from './carddav/client.js'
 import { syncCalendar } from './caldav/client.js'
 import { logContact, logErr } from './logger.js'
 import { initUpdater } from './updater.js'
+import { replayPendingSyncOperations } from './startupSync.js'
+import { enqueueSyncOperation, updateMessageOptimistic, rollbackOptimisticUpdate } from './syncQueue.js'
 
 // In dev mode, isolate data from the production install
 if (process.env.ELECTRON_RENDERER_URL) {
@@ -119,7 +121,12 @@ function createWindow() {
   _attachExternalLinkHandler(mainWindow)
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
+    // Only hide window if OS launched the app silently at login
+    const wasOpenedAsHidden = app.getLoginItemSettings().wasOpenedAsHidden
+    if (!wasOpenedAsHidden) {
+      mainWindow.show()
+      mainWindow.focus()
+    }
   })
 
   mainWindow.on('close', (e) => {
@@ -423,10 +430,18 @@ ipcMain.handle('imap:fetch-body', async (_e, folder, uid, email) => {
 })
 
 ipcMain.handle('imap:mark-read', async (_e, folder, uid, read, email) => {
-  const imapClient = getClient(email)
-  if (!imapClient) return { ok: false, error: 'Not connected' }
   try {
-    await imapClient.setFlag(folder, uid, '\\Seen', read)
+    // Optimistic update: update local DB immediately
+    const flags = read ? ['\\Seen'] : []
+    updateMessageOptimistic(folder, uid, { flags })
+
+    // Enqueue the IMAP operation for background processing
+    enqueueSyncOperation('setFlags', 'message',
+      { flag: '\\Seen', add: read },
+      { accountEmail: email, folder, uid }
+    )
+
+    // Return immediately for sub-50ms UI response
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -571,6 +586,27 @@ ipcMain.handle('smtp:send', async (_e, email, password, mailOptions) => {
   try {
     await sendEmail(email, password, mailOptions)
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('smtp:send-optimistic', async (_e, outboxEmail) => {
+  try {
+    const { addToOutbox } = await import('./syncQueue.js')
+    const id = addToOutbox(outboxEmail)
+
+    // Enqueue the actual send operation
+    enqueueSyncOperation('sendEmail', 'email',
+      {
+        email: outboxEmail.accountEmail,
+        password: null, // Will be retrieved during processing
+        mailOptions: outboxEmail
+      },
+      { accountEmail: outboxEmail.accountEmail }
+    )
+
+    return { ok: true, outboxId: id }
   } catch (err) {
     return { ok: false, error: err.message }
   }
@@ -851,6 +887,7 @@ ipcMain.handle('window:open-message', async (_e, msg) => {
       minWidth: 580,
       minHeight: 480,
       frame: false,
+      icon: getResourcePath('icon.ico'),
       backgroundColor: '#f5f5f7',
       titleBarStyle: 'hidden',
       titleBarOverlay: {
@@ -901,6 +938,7 @@ ipcMain.handle('window:open-compose', async (_e, data) => {
       minWidth: 520,
       minHeight: 480,
       frame: false,
+      icon: getResourcePath('icon.ico'),
       backgroundColor: '#f5f5f7',
       titleBarStyle: 'hidden',
       titleBarOverlay: {
@@ -1063,6 +1101,13 @@ app.whenReady().then(async () => {
       imapClients.delete(creds.email)
     })
   }
+
+  // Replay pending sync operations after clients are set up
+  setTimeout(() => {
+    replayPendingSyncOperations(imapClients).catch(err => {
+      console.error('Startup sync failed:', err.message)
+    })
+  }, 2000) // Wait 2 seconds for IMAP connections to establish
 })
 
 app.on('window-all-closed', () => {

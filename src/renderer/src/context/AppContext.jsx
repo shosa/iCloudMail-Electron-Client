@@ -55,7 +55,12 @@ const initialState = {
     syncing: false
   },
   notifications: [],
-  loading: { active: false, label: '' }
+  loading: { active: false, label: '' },
+  sync: {
+    // Global sync state tracking for animation
+    operationsInProgress: 0,  // Count of active sync operations
+    lastActivity: null        // Timestamp of last sync activity
+  }
 }
 
 function reducer(state, action) {
@@ -219,6 +224,24 @@ function reducer(state, action) {
     case 'SET_VIEW':
       return { ...state, view: action.payload }
 
+    // Global sync state
+    case 'SYNC_OPERATION_START':
+      return {
+        ...state,
+        sync: {
+          operationsInProgress: state.sync.operationsInProgress + 1,
+          lastActivity: Date.now()
+        }
+      }
+    case 'SYNC_OPERATION_END':
+      return {
+        ...state,
+        sync: {
+          operationsInProgress: Math.max(0, state.sync.operationsInProgress - 1),
+          lastActivity: Date.now()
+        }
+      }
+
     // Contacts
     case 'SET_CONTACTS':
       return { ...state, contacts: { ...state.contacts, list: action.payload, loading: false } }
@@ -258,6 +281,20 @@ export function AppProvider({ children }) {
       if (settingsRes.ok) dispatch({ type: 'UPDATE_SETTINGS', payload: settingsRes.settings })
     }
     checkAuth()
+
+    // Listen for sync operation events
+    const unsubSyncStart = window.api.on('sync:operation-start', () => {
+      dispatch({ type: 'SYNC_OPERATION_START' })
+    })
+
+    const unsubSyncEnd = window.api.on('sync:operation-end', () => {
+      dispatch({ type: 'SYNC_OPERATION_END' })
+    })
+
+    return () => {
+      unsubSyncStart?.()
+      unsubSyncEnd?.()
+    }
   }, [])
 
   return (

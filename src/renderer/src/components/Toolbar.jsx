@@ -59,6 +59,9 @@ export default function Toolbar() {
   async function handleSync() {
     const email = state.auth.email
     if (!email) return
+
+    dispatch({ type: 'SYNC_OPERATION_START' })
+
     if (view === 'contacts') {
       dispatch({ type: 'SET_CONTACTS_SYNCING', payload: true })
       try {
@@ -80,11 +83,20 @@ export default function Toolbar() {
         if (evRes.ok) dispatch({ type: 'SET_CALENDAR_EVENTS', payload: evRes.events })
       } catch { /* ignore */ }
       dispatch({ type: 'SET_CALENDAR_SYNCING', payload: false })
+    } else if (view === 'mail') {
+      // Trigger manual inbox sync for mail view
+      try {
+        await window.api.imap.syncInbox()
+      } catch { /* ignore */ }
     }
+
+    dispatch({ type: 'SYNC_OPERATION_END' })
   }
 
   const isRead = msg?.flags?.includes('\\Seen')
-  const isSyncing = view === 'contacts' ? state.contacts?.syncing : state.calendar?.syncing
+  const isLocalSyncing = view === 'contacts' ? state.contacts?.syncing : state.calendar?.syncing
+  const isGlobalSyncing = state.sync?.operationsInProgress > 0
+  const isSyncing = isLocalSyncing || isGlobalSyncing
 
   return (
     <div className="toolbar">

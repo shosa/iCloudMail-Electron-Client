@@ -79,7 +79,7 @@ function AvatarMenu({ anchorRect, email, onClose, onSettings, onSignOut, t }) {
 
 // ── Folder context menu ──────────────────────────────────────────────────────
 
-function FolderMenu({ x, y, folder, onClose, onAction }) {
+function FolderMenu({ x, y, folder, onClose, onAction, isGlobalSyncing }) {
   const t = useTranslation()
   const menuRef = useRef(null)
   const [pos, setPos] = useState({ x, y })
@@ -120,8 +120,10 @@ function FolderMenu({ x, y, folder, onClose, onAction }) {
         <span>{t('folder.markAllRead')}</span>
       </div>
       <div className="context-menu__item" onClick={() => act('refresh')} role="menuitem">
-        <span className="context-menu__icon"><IconRefresh size={15} /></span>
-        <span>{t('folder.refresh')}</span>
+        <span className="context-menu__icon">
+          <IconRefresh size={15} className={isGlobalSyncing ? 'spin' : ''} />
+        </span>
+        <span>{isGlobalSyncing ? t('folder.refreshing') : t('folder.refresh')}</span>
       </div>
       {canEmpty && (
         <>
@@ -205,8 +207,13 @@ export default function Sidebar() {
         loadFolders()
         break
       case 'refresh':
-        await loadFolders()
-        await syncSelectedFolder()
+        dispatch({ type: 'SYNC_OPERATION_START' })
+        try {
+          await loadFolders()
+          await syncSelectedFolder()
+        } finally {
+          dispatch({ type: 'SYNC_OPERATION_END' })
+        }
         break
       case 'empty':
         dispatch({ type: 'SET_LOADING', payload: t('loading.deleting') })
@@ -244,6 +251,7 @@ export default function Sidebar() {
   const initials = state.auth.email ? state.auth.email.slice(0, 2).toUpperCase() : '?'
 
   const currentView = state.view || 'mail'
+  const isGlobalSyncing = state.sync?.operationsInProgress > 0
 
   return (
     <div className="sidebar" onClick={() => { setFolderMenu(null); setAvatarMenu(false) }}>
@@ -386,6 +394,7 @@ export default function Sidebar() {
           folder={folderMenu.folder}
           onClose={() => setFolderMenu(null)}
           onAction={type => handleFolderAction(folderMenu.folder, type)}
+          isGlobalSyncing={isGlobalSyncing}
         />,
         document.querySelector('.app-root') || document.body
       )}

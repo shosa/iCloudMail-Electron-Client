@@ -1008,22 +1008,92 @@
   min-height: 200px;
 }
 
-/* TipTap editor styles */
-.tiptap-editor { height: 100%; }
-.tiptap-editor .ProseMirror {
-  padding: var(--sp-4) var(--sp-5);
-  min-height: 200px;
-  outline: none;
+/* Quill rich text editor */
+.compose-editor,
+.rich-text-editor {
+  height: 100%;
+}
+
+.rich-text-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-layer1);
+  color: var(--text-primary);
+  padding: var(--sp-2) var(--sp-4);
+}
+
+.rich-text-editor .ql-container.ql-snow {
+  flex: 1;
+  border: none;
+  font-family: var(--font-sans);
   font-size: var(--text-base);
   color: var(--text-primary);
+}
+
+.rich-text-editor,
+.rich-text-editor *,
+.rich-text-editor .ql-container,
+.rich-text-editor .ql-editor {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rich-text-editor .ql-editor {
+  min-height: 220px;
+  padding: var(--sp-4) var(--sp-5);
   line-height: 1.7;
 }
-.tiptap-editor .ProseMirror p.is-editor-empty::before {
-  content: attr(data-placeholder);
+
+.rich-text-editor .ql-editor.ql-blank::before {
   color: var(--text-tertiary);
-  pointer-events: none;
-  float: left;
-  height: 0;
+  font-style: normal;
+  left: var(--sp-5);
+  right: var(--sp-5);
+}
+
+.rich-text-editor .ql-stroke {
+  stroke: var(--text-secondary);
+}
+
+.rich-text-editor .ql-fill {
+  fill: var(--text-secondary);
+}
+
+.rich-text-editor .ql-picker,
+.rich-text-editor .ql-picker-label,
+.rich-text-editor .ql-picker-item {
+  color: var(--text-secondary);
+}
+
+.rich-text-editor .ql-toolbar button:hover .ql-stroke,
+.rich-text-editor .ql-toolbar button.ql-active .ql-stroke,
+.rich-text-editor .ql-toolbar .ql-picker-label:hover .ql-stroke,
+.rich-text-editor .ql-toolbar .ql-picker-label.ql-active .ql-stroke {
+  stroke: var(--accent);
+}
+
+.rich-text-editor .ql-toolbar button:hover .ql-fill,
+.rich-text-editor .ql-toolbar button.ql-active .ql-fill {
+  fill: var(--accent);
+}
+
+.rich-text-editor .ql-toolbar button:hover,
+.rich-text-editor .ql-toolbar button.ql-active,
+.rich-text-editor .ql-picker-label:hover,
+.rich-text-editor .ql-picker-label.ql-active {
+  color: var(--accent);
+}
+
+.rich-text-editor .ql-picker-options {
+  background: var(--bg-layer1);
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow);
 }
 
 .compose-toolbar {
@@ -1347,22 +1417,27 @@
 }
 .signature-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
 
-.tiptap-editor.settings-signature-editor {
+.settings-signature-editor {
   background: var(--glass-fill);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   min-height: 80px;
   overflow: hidden;
 }
-.tiptap-editor.settings-signature-editor .ProseMirror {
-  padding: var(--sp-3);
-  min-height: 80px;
-  font-size: var(--text-base);
-  line-height: 1.5;
+
+.rich-text-editor--signature {
+  min-height: 120px;
 }
-.tiptap-editor.settings-signature-editor:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
+
+.rich-text-editor--signature .ql-toolbar.ql-snow {
+  padding: 4px 6px;
+  background: var(--glass-fill-hover);
+}
+
+.rich-text-editor--signature .ql-editor {
+  min-height: 80px;
+  padding: var(--sp-3);
+  line-height: 1.5;
 }
 
 .settings-sig-toolbar {
@@ -1428,7 +1503,7 @@
   border-left-color: rgba(0, 0, 0, 0.12);
 }
 .theme-light .settings-select,
-.theme-light .tiptap-editor.settings-signature-editor .ProseMirror {
+.theme-light .settings-signature-editor {
   border-color: rgba(0, 0, 0, 0.18);
   background: rgba(255, 255, 255, 0.8);
 }
@@ -2476,9 +2551,21 @@
   transition: background var(--duration-fast) var(--ease-default);
   position: relative;
 }
-.context-menu__item:hover { background: var(--glass-fill-hover); }
+.context-menu__item:hover {
+  background: #0071e3;
+  color: white;
+}
+.context-menu__item:hover .context-menu__icon {
+  color: white;
+}
 .context-menu__item--danger { color: var(--color-error); }
-.context-menu__item--danger:hover { background: rgba(255,69,58,0.12); }
+.context-menu__item--danger:hover {
+  background: #ff453a;
+  color: white;
+}
+.context-menu__item--danger:hover .context-menu__icon {
+  color: white;
+}
 .context-menu__item--disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .context-menu__item--submenu { justify-content: flex-start; }
 
@@ -2595,4 +2682,179 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Address Chips for Compose ─────────────────────────────────────────── */
+
+.compose-field__chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  min-height: 40px;
+  transition: border-color var(--duration-base) var(--ease-default);
+}
+
+.compose-field__chip-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.address-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  max-width: 300px;
+  transition: all var(--duration-base) var(--ease-default);
+}
+
+.address-chip:hover {
+  background: var(--glass-fill-hover);
+  border-color: var(--border-hover);
+}
+
+.address-chip--invalid {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: rgba(255, 59, 48, 0.5);
+  color: #d70015;
+}
+
+.address-chip--invalid:hover {
+  background: rgba(255, 59, 48, 0.15);
+}
+
+.address-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.address-chip__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1;
+  transition: all var(--duration-base) var(--ease-default);
+}
+
+.address-chip__remove:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.address-chip--invalid .address-chip__remove {
+  color: #d70015;
+}
+
+.address-chip--invalid .address-chip__remove:hover {
+  background: #d70015;
+  color: white;
+}
+
+/* ── Email Body Context Menu ──────────────────────────────────────────── */
+
+.email-context-menu {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  padding: var(--sp-1);
+  min-width: 120px;
+}
+
+.email-context-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--duration-base) var(--ease-default);
+}
+
+.email-context-menu__item:hover {
+  background: #0071e3;
+  color: white;
+}
+
+.email-context-menu__item:active {
+  background: var(--glass-fill-active);
+}
+
+/* ── Sync Button Animation ────────────────────────────────────────────── */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ── Email HTML Content Styles ────────────────────────────────────────── */
+
+.reading-pane__html-content {
+  /* Reset and base styles for email HTML content */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.reading-pane__html-content * {
+  max-width: 100% !important;
+}
+
+.reading-pane__html-content img {
+  height: auto !important;
+  max-width: 100% !important;
+}
+
+.reading-pane__html-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.reading-pane__html-content a:hover {
+  color: var(--accent-hover);
+}
+
+.reading-pane__html-content table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.reading-pane__html-content blockquote {
+  border-left: 3px solid var(--border);
+  margin: var(--sp-3) 0;
+  padding-left: var(--sp-3);
+  color: var(--text-secondary);
 }

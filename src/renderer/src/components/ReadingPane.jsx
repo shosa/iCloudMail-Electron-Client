@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
 import {
@@ -42,6 +42,74 @@ function addrColor(name) {
   return ADDR_COLORS[Math.abs(h) % ADDR_COLORS.length]
 }
 
+function EmailBodyContextMenu({ isVisible, position, selectedText, selectedLink, onClose, onAction }) {
+  const menuRef = useRef(null)
+  const t = useTranslation()
+
+  useEffect(() => {
+    if (isVisible) {
+      const handleClickOutside = (e) => {
+        if (menuRef.current && !menuRef.current.contains(e.target)) {
+          onClose()
+        }
+      }
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          onClose()
+        }
+      }
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleKeyDown)
+      }
+    }
+  }, [isVisible, onClose])
+
+  if (!isVisible) return null
+
+  // Adjust position if menu would go off screen
+  const menuWidth = 140
+  const menuHeight = selectedLink ? 120 : 60
+  const adjustedPosition = {
+    x: Math.min(position.x, window.innerWidth - menuWidth - 10),
+    y: Math.min(position.y, window.innerHeight - menuHeight - 10)
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      className="email-context-menu"
+      style={{
+        position: 'fixed',
+        left: Math.max(10, adjustedPosition.x),
+        top: Math.max(10, adjustedPosition.y),
+        zIndex: 1000
+      }}
+    >
+      {selectedText && (
+        <button onClick={() => onAction('copy')} className="email-context-menu__item">
+          {t('action.copy')}
+        </button>
+      )}
+      <button onClick={() => onAction('selectAll')} className="email-context-menu__item">
+        {t('action.selectAll')}
+      </button>
+      {selectedLink && (
+        <>
+          <button onClick={() => onAction('copyLink')} className="email-context-menu__item">
+            {t('action.copyLink')}
+          </button>
+          <button onClick={() => onAction('openLink')} className="email-context-menu__item">
+            {t('action.openLink')}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AddressChip({ address, onCompose, large }) {
   const a = typeof address === 'string' ? { email: address, name: '' } : (address || {})
   const email = a.email || ''
@@ -77,11 +145,68 @@ function formatFullDate(ts) {
 
 function buildSafeHTML(html, blockImages) {
   let safe = html || ''
+  safe = safe.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  safe = safe.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  safe = safe.replace(/\s+(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, ' $1="#"')
   if (blockImages) {
     safe = safe.replace(/<img\s/gi, '<img data-blocked="true" style="display:none" ')
     safe = safe.replace(/url\(['"]?https?:\/\/[^'")\s]+['"]?\)/gi, 'url()')
   }
   return safe
+}
+
+function buildEmailIframeDoc(renderHtml) {
+  const bridgeScript = `(${function () {
+    document.addEventListener('contextmenu', function (event) {
+      event.preventDefault()
+      var link = event.target && event.target.closest ? event.target.closest('a') : null
+      parent.postMessage({
+        type: 'kumo-email-context-menu',
+        x: event.clientX,
+        y: event.clientY,
+        selectedText: String(window.getSelection ? window.getSelection() : '').trim(),
+        selectedLink: link ? link.href : '',
+        allText: document.body ? (document.body.innerText || document.body.textContent || '') : ''
+      }, '*')
+    })
+
+    window.addEventListener('message', function (event) {
+      if (!event.data || event.data.type !== 'kumo-email-select-all') return
+      var range = document.createRange()
+      range.selectNodeContents(document.body)
+      var selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })
+  }.toString()})()`
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1d1d1f;
+    background: #ffffff;
+    margin: 0;
+    padding: 20px 24px;
+    word-break: break-word;
+    overflow-x: hidden;
+  }
+  a { color: #0071e3; }
+  img { max-width: 100%; height: auto; display: block; }
+  img[data-blocked] { display: none !important; }
+  pre { white-space: pre-wrap; background: #f5f5f7; padding: 12px; border-radius: 8px; font-size: 13px; }
+  blockquote { border-left: 3px solid #d2d2d7; margin: 8px 0 8px 8px; padding-left: 12px; color: #6e6e73; }
+  table { border-collapse: collapse; max-width: 100%; }
+</style>
+</head>
+<body>${renderHtml}<script>${bridgeScript}</script></body>
+</html>`
 }
 
 export default function ReadingPane() {
@@ -96,6 +221,17 @@ export default function ReadingPane() {
   const [imagesLoadedByUser, setImagesLoadedByUser] = useState(false)
   const [filePreview, setFilePreview] = useState(null)   // { src, filename, isPdf, localPath }
   const [loadingIdx, setLoadingIdx] = useState(null)
+  const htmlIframeRef = useRef(null)
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({
+    isVisible: false,
+    position: { x: 0, y: 0 },
+    selectedText: '',
+    selectedLink: '',
+    allText: ''
+  })
+
 
   useEffect(() => {
     if (!msg) { setBody(null); setAttachmentMeta([]); return }
@@ -116,6 +252,96 @@ export default function ReadingPane() {
       dispatch({ type: 'CLEAR_LOADING' })
     }).catch(() => { setBodyLoading(false); dispatch({ type: 'CLEAR_LOADING' }) })
   }, [msg?.uid, msg?.folder])
+
+  useEffect(() => {
+    function handleIframeMessage(event) {
+      if (event.data?.type !== 'kumo-email-context-menu') return
+      const rect = htmlIframeRef.current?.getBoundingClientRect()
+      setContextMenu({
+        isVisible: true,
+        position: {
+          x: (rect?.left || 0) + event.data.x,
+          y: (rect?.top || 0) + event.data.y
+        },
+        selectedText: event.data.selectedText || '',
+        selectedLink: event.data.selectedLink || '',
+        allText: event.data.allText || ''
+      })
+    }
+
+    window.addEventListener('message', handleIframeMessage)
+    return () => window.removeEventListener('message', handleIframeMessage)
+  }, [])
+
+  // Context menu handlers
+  function handleContextMenu(e) {
+    // Solo prevenire il menu del browser, non la selezione
+    if (e.type === 'contextmenu') {
+      e.preventDefault()
+    }
+
+    const selectedText = window.getSelection()?.toString().trim() || ''
+    let selectedLink = ''
+
+    // Check if right-click was on a link
+    if (e.target.tagName === 'A') {
+      selectedLink = e.target.href
+    } else if (e.target.closest('a')) {
+      selectedLink = e.target.closest('a').href
+    }
+
+    setContextMenu({
+      isVisible: true,
+      position: { x: e.clientX, y: e.clientY },
+      selectedText,
+      selectedLink
+    })
+  }
+
+  function handleContextMenuAction(action) {
+    switch (action) {
+      case 'copy':
+        if (contextMenu.selectedText) {
+          navigator.clipboard.writeText(contextMenu.selectedText)
+        } else {
+          // Fallback: copy all visible text if no selection
+          const plainContent = document.querySelector('.reading-pane__plain-text')
+          if (contextMenu.allText) {
+            navigator.clipboard.writeText(contextMenu.allText)
+          } else if (plainContent) {
+            const target = plainContent
+            navigator.clipboard.writeText(target.textContent || target.innerText || '')
+          }
+        }
+        break
+      case 'copyLink':
+        if (contextMenu.selectedLink) {
+          navigator.clipboard.writeText(contextMenu.selectedLink)
+        }
+        break
+      case 'openLink':
+        if (contextMenu.selectedLink) {
+          window.api.shell.openExternal(contextMenu.selectedLink)
+        }
+        break
+      case 'selectAll':
+        const plainContent = document.querySelector('.reading-pane__plain-text')
+        const target = plainContent
+
+        if (target) {
+          const range = document.createRange()
+          range.selectNodeContents(target)
+          const selection = window.getSelection()
+          selection.removeAllRanges()
+          selection.addRange(range)
+        } else {
+          htmlIframeRef.current?.contentWindow?.postMessage({ type: 'kumo-email-select-all' }, '*')
+        }
+        break
+    }
+    setContextMenu({ ...contextMenu, isVisible: false })
+  }
+
 
   function handleReply() {
     window.api.window.openCompose({ mode: 'reply', message: msg, body })
@@ -250,35 +476,7 @@ export default function ReadingPane() {
     ? buildSafeHTML(body.html, imagesBlocked && !imagesLoadedByUser)
     : null
 
-  const iframeDoc = renderHtml
-    ? `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-    color: #1d1d1f;
-    background: #ffffff;
-    margin: 0;
-    padding: 20px 24px;
-    word-break: break-word;
-    overflow-x: hidden;
-  }
-  a { color: #0071e3; }
-  img { max-width: 100%; height: auto; display: block; }
-  img[data-blocked] { display: none !important; }
-  pre { white-space: pre-wrap; background: #f5f5f7; padding: 12px; border-radius: 8px; font-size: 13px; }
-  blockquote { border-left: 3px solid #d2d2d7; margin: 8px 0 8px 8px; padding-left: 12px; color: #6e6e73; }
-  table { border-collapse: collapse; max-width: 100%; }
-</style>
-</head>
-<body>${renderHtml}</body>
-</html>`
-    : null
+  const iframeDoc = renderHtml ? buildEmailIframeDoc(renderHtml) : null
 
   return (
     <div className="reading-pane">
@@ -421,13 +619,23 @@ export default function ReadingPane() {
           </div>
         ) : iframeDoc ? (
           <iframe
+            ref={htmlIframeRef}
             className="reading-pane__webview"
-            sandbox="allow-same-origin allow-popups"
+            sandbox="allow-same-origin allow-scripts allow-popups"
             srcDoc={iframeDoc}
             title="Email body"
           />
         ) : textContent ? (
-          <div className="reading-pane__plain-text">{textContent}</div>
+          <div
+            className="reading-pane__plain-text"
+            style={{
+              userSelect: 'text',
+              cursor: 'text'
+            }}
+            onContextMenu={handleContextMenu}
+          >
+            {textContent}
+          </div>
         ) : (
           <div style={{ padding: 'var(--sp-5)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
             {t('reading.noContent')}
@@ -444,15 +652,25 @@ export default function ReadingPane() {
               loading={loadingIdx === i}
               onPreview={() => handlePreviewAttachment(att, i)}
               onSave={() => handleSaveAttachment(att, i)}
+              t={t}
             />
           ))}
         </div>
       )}
+
+      <EmailBodyContextMenu
+        isVisible={contextMenu.isVisible}
+        position={contextMenu.position}
+        selectedText={contextMenu.selectedText}
+        selectedLink={contextMenu.selectedLink}
+        onClose={() => setContextMenu({ ...contextMenu, isVisible: false })}
+        onAction={handleContextMenuAction}
+      />
     </div>
   )
 }
 
-function AttachmentChip({ attachment, loading, onPreview, onSave }) {
+function AttachmentChip({ attachment, loading, onPreview, onSave, t }) {
   const isImage = attachment.type?.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(attachment.filename || '')
   const isPdf   = attachment.type === 'application/pdf' || /\.pdf$/i.test(attachment.filename || '')
   const canPreview = isImage || isPdf
@@ -483,8 +701,8 @@ function AttachmentChip({ attachment, loading, onPreview, onSave }) {
       <button
         className="attachment-chip__dl-btn"
         onClick={e => { e.stopPropagation(); onSave() }}
-        title="Salva file"
-        aria-label="Salva file"
+        title={t('action.saveFile')}
+        aria-label={t('action.saveFile')}
       >
         <IconDownload size={13} />
       </button>

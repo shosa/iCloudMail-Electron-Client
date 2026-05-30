@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
-import Image from '@tiptap/extension-image'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
+import RichTextEditor from './RichTextEditor'
 import {
-  IconClose, IconAttach, IconSend,
-  IconBold, IconItalic, IconUnderlineF, IconStrike,
-  IconListBullet, IconListOrdered,
-  IconAlignLeft, IconAlignCenter, IconAlignRight,
-  IconQuote
+  IconClose, IconAttach, IconSend
 } from './Icons'
 
 function buildReplyBody(mode, msg, body) {
@@ -53,51 +43,184 @@ function buildReplyTo(mode, msg, selfEmail) {
   return ''
 }
 
-function RecipientField({ label, value, onChange, placeholder, trailing }) {
+// Address parsing utilities
+function isValidEmailAddress(email) {
+  if (!email || typeof email !== 'string') return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+}
+
+function parseAddressString(input) {
+  if (!input || typeof input !== 'string') return []
+
+  const addresses = []
+  // Split by comma or semicolon, but not within angle brackets
+  const parts = input.split(/[,;](?![^<]*>)/).map(s => s.trim()).filter(Boolean)
+
+  for (const part of parts) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+
+    // RFC 5322 format: "Name <email@domain.com>"
+    const namedMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/)
+    if (namedMatch) {
+      const name = namedMatch[1].trim().replace(/^["']|["']$/g, '') // Remove quotes
+      const email = namedMatch[2].trim()
+      addresses.push({
+        name,
+        address: email,
+        isValid: isValidEmailAddress(email),
+        display: `${name} <${email}>`
+      })
+    } else {
+      // Bare email format: "email@domain.com"
+      const email = trimmed
+      addresses.push({
+        name: '',
+        address: email,
+        isValid: isValidEmailAddress(email),
+        display: email
+      })
+    }
+  }
+
+  return addresses
+}
+
+function AddressChip({ address, onRemove, removeLabel }) {
+  const chipClass = `address-chip${!address.isValid ? ' address-chip--invalid' : ''}`
+  return (
+    <span className={chipClass}>
+      <span className="address-chip__text">
+        {address.name ? `${address.name} <${address.address}>` : address.address}
+      </span>
+      <button
+        className="address-chip__remove"
+        onClick={onRemove}
+        type="button"
+        aria-label={removeLabel}
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
+function RecipientField({ label, addresses, onChange, placeholder, trailing }) {
   const state = useAppState()
+  const t = useTranslation()
   const [suggestions, setSuggestions] = useState([])
+  const [inputValue, setInputValue] = useState('')
   const [focused, setFocused] = useState(false)
   const wrapRef = useRef(null)
+  const inputRef = useRef(null)
 
   useEffect(() => {
-    const q = value.split(/[,;]\s*/).pop().trim()
-    if (!q || q.length < 2 || !focused) { setSuggestions([]); return }
+    const query = inputValue.trim()
+    if (!query || query.length < 2 || !focused) { setSuggestions([]); return }
     const contacts = state.contacts?.list || []
-    const lower = q.toLowerCase()
+    const lower = query.toLowerCase()
     const matches = contacts.filter(c =>
       (c.display_name || '').toLowerCase().includes(lower) ||
       (c.email || '').toLowerCase().includes(lower)
     ).slice(0, 6)
     setSuggestions(matches)
-  }, [value, focused, state.contacts?.list])
+  }, [inputValue, focused, state.contacts?.list])
 
   useEffect(() => {
-    function close(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setSuggestions([]) }
+    function close(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setSuggestions([])
+        parseAndAddAddresses()
+      }
+    }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
-  }, [])
+  }, [inputValue])
+
+  function parseAndAddAddresses() {
+    if (!inputValue.trim()) return
+
+    const newAddresses = parseAddressString(inputValue)
+    if (newAddresses.length > 0) {
+      onChange([...addresses, ...newAddresses])
+      setInputValue('')
+      setSuggestions([])
+    }
+  }
 
   function pickContact(contact) {
     const email = contact.email || ''
-    const display = contact.display_name ? `${contact.display_name} <${email}>` : email
-    const parts = value.split(/[,;]\s*/)
-    parts[parts.length - 1] = display
-    onChange(parts.join(', ') + ', ')
+    const name = contact.display_name || ''
+    const newAddress = {
+      name,
+      address: email,
+      isValid: isValidEmailAddress(email),
+      display: name ? `${name} <${email}>` : email
+    }
+    onChange([...addresses, newAddress])
+    setInputValue('')
     setSuggestions([])
+  }
+
+  function removeAddress(index) {
+    const newAddresses = addresses.filter((_, i) => i !== index)
+    onChange(newAddresses)
+  }
+
+  function handleKeyDown(e) {
+    const key = e.key
+
+    if (key === 'Enter' || key === 'Tab' || key === ',' || key === ';') {
+      e.preventDefault()
+      parseAndAddAddresses()
+      if (key === 'Tab') {
+        // Let tab continue to next field after parsing
+        setTimeout(() => {
+          const nextElement = document.querySelector(`input:not([tabindex="-1"]), button:not([tabindex="-1"])`)
+          if (nextElement) nextElement.focus()
+        }, 0)
+      }
+    } else if (key === 'Backspace' && !inputValue && addresses.length > 0) {
+      // Remove last chip if input is empty and backspace is pressed
+      removeAddress(addresses.length - 1)
+    }
+  }
+
+  function handlePaste(e) {
+    e.preventDefault()
+    const pastedText = (e.clipboardData || window.clipboardData).getData('text')
+    const newAddresses = parseAddressString(pastedText)
+    if (newAddresses.length > 0) {
+      onChange([...addresses, ...newAddresses])
+    }
   }
 
   return (
     <div className="compose-field" ref={wrapRef} style={{ position: 'relative' }}>
       <span className="compose-field__label">{label}</span>
-      <input
-        className="compose-field__input"
-        placeholder={placeholder}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 150)}
-        autoComplete="off"
-      />
+      <div className="compose-field__chip-input">
+        {addresses.map((addr, i) => (
+          <AddressChip
+            key={i}
+            address={addr}
+            onRemove={() => removeAddress(i)}
+            removeLabel={t('action.remove')}
+          />
+        ))}
+        <input
+          ref={inputRef}
+          className="compose-field__input"
+          placeholder={addresses.length === 0 ? placeholder : ''}
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          autoComplete="off"
+          style={{ border: 'none', outline: 'none', flex: 1, minWidth: '120px' }}
+        />
+      </div>
       {trailing}
       {suggestions.length > 0 && (
         <div className="compose-autocomplete">
@@ -126,69 +249,58 @@ export default function ComposeWindow() {
   const { mode, referencedMessage } = state.compose
   const msg = referencedMessage
 
-  const [to, setTo] = useState('')
-  const [cc, setCc] = useState('')
-  const [bcc, setBcc] = useState('')
+  const [to, setTo] = useState([])
+  const [cc, setCc] = useState([])
+  const [bcc, setBcc] = useState([])
   const [subject, setSubject] = useState('')
   const [showCcBcc, setShowCcBcc] = useState(mode === 'replyAll')
   const [sending, setSending] = useState(false)
+  const [contextMenu, setContextMenu] = useState(null)
+
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [draftId, setDraftId] = useState(null)
   const [bodyVersion, setBodyVersion] = useState(0)
   const draftTimer = useRef(null)
+  const editorRef = useRef(null)
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: t('compose.placeholder') }),
-      Image.configure({ inline: true, allowBase64: true }),
-    ],
-    onUpdate: () => setBodyVersion(v => v + 1),
-    editorProps: {
-      handlePaste(view, event) {
-        const items = event.clipboardData?.items || []
-        for (const item of items) {
-          if (item.type.startsWith('image/')) {
-            event.preventDefault()
-            const file = item.getAsFile()
-            if (!file) return false
-            const reader = new FileReader()
-            reader.onload = e => {
-              view.dispatch(
-                view.state.tr.replaceSelectionWith(
-                  view.state.schema.nodes.image.create({ src: e.target.result })
-                )
-              )
-            }
-            reader.readAsDataURL(file)
-            return true
-          }
-        }
-        return false
-      }
+  const [editorContent, setEditorContent] = useState('')
+
+  // Quill configuration completa come Outlook
+  const quillModules = {
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        [{ 'align': [] }],
+        ['blockquote', 'code-block'],
+        ['link', 'image', 'video'],
+        ['clean']
+      ]
     },
-    content: ''
-  })
+    clipboard: {
+      matchVisual: false
+    }
+  }
 
   useEffect(() => {
-    if (!editor) return
     const replyBody = buildReplyBody(mode, msg, msg?.body)
     const sig = state.settings.signature
       ? `<p></p><p>--</p><p>${state.settings.signature}</p>`
       : '<p></p>'
-    editor.commands.setContent(sig + (mode !== 'new' ? replyBody : ''))
-    editor.commands.focus('start')
-  }, [editor, mode, msg])
+    setEditorContent(sig + (mode !== 'new' ? replyBody : ''))
+  }, [mode, msg, state.settings.signature])
 
   useEffect(() => {
     if (!msg) return
     if (mode !== 'new') {
-      setTo(buildReplyTo(mode, msg, state.auth.email))
+      const replyToString = buildReplyTo(mode, msg, state.auth.email)
+      setTo(parseAddressString(replyToString))
       setSubject(buildReplySubject(mode, msg.subject))
       if (mode === 'replyAll') setShowCcBcc(true)
     }
@@ -209,15 +321,21 @@ export default function ComposeWindow() {
     if (!state.auth.email) return
     clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(async () => {
-      const html = editor?.getHTML() || ''
-      if (!to && !subject && html === '<p></p>') return
+      const html = editorContent || ''
+      if (to.length === 0 && !subject && html === '<p></p>') return
+
+      // Convert address arrays to strings for draft storage
+      const formatAddresses = (addresses) => addresses.map(addr =>
+        addr.name ? `${addr.name} <${addr.address}>` : addr.address
+      ).join(', ')
+
       const draft = {
         id: draftId || undefined,
         account_email: state.auth.email,
         subject,
-        to_field: to,
-        cc_field: cc,
-        bcc_field: bcc,
+        to_field: formatAddresses(to),
+        cc_field: formatAddresses(cc),
+        bcc_field: formatAddresses(bcc),
         body_html: html,
         in_reply_to: msg?.message_id || null,
         message_refs: msg?.message_id || null,
@@ -229,14 +347,61 @@ export default function ComposeWindow() {
     return () => clearTimeout(draftTimer.current)
   }, [to, cc, bcc, subject, attachments, bodyVersion, draftId])
 
+  function handleContextMenu(e) {
+    e.preventDefault()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      selectedText: editorRef.current?.getSelectedText()?.trim() || ''
+    })
+  }
+
+  async function handleEditorContextAction(action) {
+    try {
+      switch (action) {
+        case 'copy':
+          await editorRef.current?.copySelection()
+          break
+        case 'cut':
+          await editorRef.current?.cutSelection()
+          break
+        case 'paste':
+          await editorRef.current?.pasteText()
+          break
+        case 'selectAll':
+          editorRef.current?.selectAll()
+          break
+        case 'clearFormatting':
+          editorRef.current?.clearSelectionFormatting()
+          break
+        case 'attach':
+          await handleAttachFiles()
+          break
+      }
+    } catch (err) {
+      console.warn('Compose context action failed:', err)
+    }
+    setContextMenu(null)
+  }
+
   async function handleSend() {
-    if (!to.trim()) { setError(t('compose.error.noRecipient')); return }
+    // Check if we have recipients
+    if (to.length === 0) { setError(t('compose.error.noRecipient')); return }
     if (!subject.trim()) { setError(t('compose.error.noSubject')); return }
+
+    // Check for invalid addresses
+    const allAddresses = [...to, ...cc, ...bcc]
+    const invalidAddresses = allAddresses.filter(addr => !addr.isValid)
+    if (invalidAddresses.length > 0) {
+      setError(t('compose.error.invalidAddresses'))
+      return
+    }
+
     setSending(true)
     setError(null)
 
-    const html = editor?.getHTML() || ''
-    const text = editor?.getText() || ''
+    const html = editorRef.current?.getHTML() || editorContent || ''
+    const text = editorContent.replace(/<[^>]*>/g, '') || ''
 
     const creds = await window.api.auth.getCredentials()
     if (!creds.ok || !creds.creds) {
@@ -247,10 +412,15 @@ export default function ComposeWindow() {
 
     const fromName = creds.creds.email
 
+    // Convert address arrays to strings for email sending
+    const formatAddresses = (addresses) => addresses.map(addr =>
+      addr.name ? `${addr.name} <${addr.address}>` : addr.address
+    ).join(', ')
+
     const mailOptions = {
-      to,
-      cc: cc || undefined,
-      bcc: bcc || undefined,
+      to: formatAddresses(to),
+      cc: cc.length > 0 ? formatAddresses(cc) : undefined,
+      bcc: bcc.length > 0 ? formatAddresses(bcc) : undefined,
       subject,
       html,
       text,
@@ -260,7 +430,21 @@ export default function ComposeWindow() {
       attachments: attachments.map(a => ({ filename: a.name, path: a.path }))
     }
 
-    const result = await window.api.smtp.send(creds.creds.email, creds.creds.password, mailOptions)
+    // Optimistic sending: add to outbox and show as sent immediately
+    const outboxEmail = {
+      accountEmail: creds.creds.email,
+      to: formatAddresses(to),
+      cc: cc.length > 0 ? formatAddresses(cc) : undefined,
+      bcc: bcc.length > 0 ? formatAddresses(bcc) : undefined,
+      subject,
+      html,
+      text,
+      inReplyTo: msg?.message_id || undefined,
+      references: msg?.message_id || undefined,
+      attachments: attachments.map(a => ({ filename: a.name, path: a.path }))
+    }
+
+    const result = await window.api.smtp.sendOptimistic(outboxEmail)
     if (result.ok) {
       if (draftId) { window.api.drafts.delete(draftId); setDraftId(null) }
       setSent(true)
@@ -272,14 +456,20 @@ export default function ComposeWindow() {
   }
 
   async function handleSaveDraft() {
-    const html = editor?.getHTML() || ''
+    const html = editorRef.current?.getHTML() || editorContent || ''
+
+    // Convert address arrays to strings for draft storage
+    const formatAddresses = (addresses) => addresses.map(addr =>
+      addr.name ? `${addr.name} <${addr.address}>` : addr.address
+    ).join(', ')
+
     const draft = {
       id: draftId || undefined,
       account_email: state.auth.email,
       subject,
-      to_field: to,
-      cc_field: cc,
-      bcc_field: bcc,
+      to_field: formatAddresses(to),
+      cc_field: formatAddresses(cc),
+      bcc_field: formatAddresses(bcc),
       body_html: html,
       in_reply_to: msg?.message_id || null,
       message_refs: msg?.message_id || null,
@@ -301,21 +491,9 @@ export default function ComposeWindow() {
     return `${prefix} ${msg?.subject || ''}${suffix}`
   })()
 
-  const ToolBtn = ({ onClick, active, title, children }) => (
-    <button
-      className={`compose-tool-btn${active ? ' active' : ''}`}
-      onMouseDown={e => { e.preventDefault(); onClick() }}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-    >
-      {children}
-    </button>
-  )
-
   return (
     <div className="compose-overlay" onClick={e => e.target === e.currentTarget && handleClose()}>
-      <div className="compose-window">
+      <div className="compose-window" onClick={() => setContextMenu(null)}>
         {/* Header */}
         <div className="compose-window__header">
           <span className="compose-window__title truncate">{windowTitle}</span>
@@ -328,9 +506,9 @@ export default function ComposeWindow() {
         <div className="compose-window__fields">
           <RecipientField
             label={t('compose.to')}
-            value={to}
+            addresses={to}
             onChange={setTo}
-            placeholder="recipient@example.com"
+            placeholder={t('compose.recipientPlaceholder')}
             trailing={
               <button
                 className="compose-field__cc-toggle"
@@ -346,15 +524,15 @@ export default function ComposeWindow() {
             <>
               <RecipientField
                 label={t('compose.cc')}
-                value={cc}
+                addresses={cc}
                 onChange={setCc}
-                placeholder="cc@example.com"
+                placeholder={t('compose.ccPlaceholder')}
               />
               <RecipientField
                 label={t('compose.bcc')}
-                value={bcc}
+                addresses={bcc}
                 onChange={setBcc}
-                placeholder="bcc@example.com"
+                placeholder={t('compose.bccPlaceholder')}
               />
             </>
           )}
@@ -370,71 +548,34 @@ export default function ComposeWindow() {
           </div>
         </div>
 
-        {/* Rich text toolbar */}
+        {/* Attachments */}
         <div className="compose-toolbar">
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={editor?.isActive('bold')} title={t('compose.bold')}>
-            <IconBold size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={editor?.isActive('italic')} title={t('compose.italic')}>
-            <IconItalic size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleUnderline().run()}
-            active={editor?.isActive('underline')} title={t('compose.underline')}>
-            <IconUnderlineF size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleStrike().run()}
-            active={editor?.isActive('strike')} title={t('compose.strike')}>
-            <IconStrike size={15} />
-          </ToolBtn>
-
-          <div className="compose-toolbar__separator" />
-
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={editor?.isActive('bulletList')} title={t('compose.bulletList')}>
-            <IconListBullet size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-            active={editor?.isActive('orderedList')} title={t('compose.orderedList')}>
-            <IconListOrdered size={15} />
-          </ToolBtn>
-
-          <div className="compose-toolbar__separator" />
-
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('left').run()}
-            active={editor?.isActive({ textAlign: 'left' })} title={t('compose.alignLeft')}>
-            <IconAlignLeft size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('center').run()}
-            active={editor?.isActive({ textAlign: 'center' })} title={t('compose.alignCenter')}>
-            <IconAlignCenter size={15} />
-          </ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('right').run()}
-            active={editor?.isActive({ textAlign: 'right' })} title={t('compose.alignRight')}>
-            <IconAlignRight size={15} />
-          </ToolBtn>
-
-          <div className="compose-toolbar__separator" />
-
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            active={editor?.isActive('blockquote')} title={t('compose.quote')}>
-            <IconQuote size={15} />
-          </ToolBtn>
-
-          <div className="compose-toolbar__separator" />
-
-          <ToolBtn onClick={handleAttachFiles} active={false} title={t('compose.attach')}>
+          <button
+            className="compose-tool-btn"
+            onMouseDown={e => e.preventDefault()}
+            onClick={handleAttachFiles}
+            title={t('compose.attach')}
+            aria-label={t('compose.attach')}
+          >
             <IconAttach size={15} />
-          </ToolBtn>
+          </button>
 
           <div className="compose-toolbar__spacer" />
         </div>
 
         {/* Editor */}
         <div className="compose-window__editor">
-          <div className="tiptap-editor">
-            {editor && <EditorContent editor={editor} />}
+          <div className="compose-editor" onContextMenu={handleContextMenu}>
+            <RichTextEditor
+              ref={editorRef}
+              value={editorContent}
+              onChange={(html) => {
+                setEditorContent(html)
+                setBodyVersion(v => v + 1)
+              }}
+              placeholder={t('compose.placeholder')}
+              modules={quillModules}
+            />
           </div>
         </div>
 
@@ -485,7 +626,7 @@ export default function ComposeWindow() {
             <button
               className="btn btn--primary"
               onClick={handleSend}
-              disabled={sending || sent || !to.trim()}
+              disabled={sending || sent || to.length === 0 || [...to, ...cc, ...bcc].some(addr => !addr.isValid)}
             >
               {sending ? (
                 <>
@@ -502,6 +643,44 @@ export default function ComposeWindow() {
           </div>
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          className="email-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('copy')}>
+              {t('action.copy')}
+            </button>
+          )}
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('cut')}>
+              {t('action.cut')}
+            </button>
+          )}
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('paste')}>
+            {t('action.paste')}
+          </button>
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('selectAll')}>
+            {t('action.selectAll')}
+          </button>
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('clearFormatting')}>
+              {t('action.clearFormatting')}
+            </button>
+          )}
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('attach')}>
+            {t('compose.attach')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

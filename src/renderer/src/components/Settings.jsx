@@ -1,10 +1,8 @@
-import React, { useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
+import React, { useEffect, useState } from 'react'
 import { useAppState, useAppDispatch } from '../context/AppContext'
 import { useTranslation } from '../i18n/index'
-import { IconClose, IconSignOut, IconClearCache, IconTrash, IconCheck, IconFolderOpen, IconBold, IconItalic, IconUnderlineF } from './Icons'
+import RichTextEditor from './RichTextEditor'
+import { IconClose, IconSignOut, IconClearCache, IconTrash, IconCheck, IconFolderOpen } from './Icons'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -94,13 +92,22 @@ export default function Settings() {
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetting, setResetting] = useState(false)
 
-  const sigEditor = useEditor({
-    extensions: [StarterKit, Underline],
-    content: local.signature || '',
-    onUpdate: ({ editor }) => {
-      setLocal(s => ({ ...s, signature: editor.getHTML() }))
-    }
-  })
+  // Signature editor state
+  const [signatureContent, setSignatureContent] = useState(local.signature || '')
+
+  // Simple toolbar for signature
+  const signatureModules = {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['link']
+    ]
+  }
+
+  // Sync signature content with local settings
+  useEffect(() => {
+    setSignatureContent(local.signature || '')
+  }, [local.signature])
 
 
   function handleDensityChange(density) {
@@ -263,27 +270,18 @@ export default function Settings() {
           <div className="settings-section">
             <div className="settings-section__title">{t('settings.signature')}</div>
             <div className="settings-section__label">{t('settings.signatureLabel')}</div>
-            <div className="tiptap-editor settings-signature-editor">
-              {sigEditor && (
-                <div className="settings-sig-toolbar">
-                  <button
-                    className={`settings-sig-toolbar__btn${sigEditor.isActive('bold') ? ' is-active' : ''}`}
-                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleBold().run() }}
-                    title="Bold"
-                  ><IconBold size={16} /></button>
-                  <button
-                    className={`settings-sig-toolbar__btn${sigEditor.isActive('italic') ? ' is-active' : ''}`}
-                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleItalic().run() }}
-                    title="Italic"
-                  ><IconItalic size={16} /></button>
-                  <button
-                    className={`settings-sig-toolbar__btn${sigEditor.isActive('underline') ? ' is-active' : ''}`}
-                    onMouseDown={e => { e.preventDefault(); sigEditor.chain().focus().toggleUnderline().run() }}
-                    title="Underline"
-                  ><IconUnderlineF size={16} /></button>
-                </div>
-              )}
-              {sigEditor && <EditorContent editor={sigEditor} />}
+            <div className="settings-signature-editor">
+              <RichTextEditor
+                className="rich-text-editor--signature"
+                value={signatureContent}
+                onChange={(html) => {
+                  setSignatureContent(html)
+                  setLocal(s => ({ ...s, signature: html }))
+                  setSaved(false)
+                }}
+                modules={signatureModules}
+                placeholder={t('settings.signaturePlaceholder')}
+              />
             </div>
           </div>
 

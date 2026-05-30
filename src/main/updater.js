@@ -1,64 +1,83 @@
-import { autoUpdater } from 'electron-updater'
 import { ipcMain } from 'electron'
 
 let _sender = null
+let _autoUpdater = null
+let _registered = false
 
-autoUpdater.autoDownload = false
-autoUpdater.autoInstallOnAppQuit = false
+async function getAutoUpdater() {
+  if (_autoUpdater) return _autoUpdater
+  if (process.env.ELECTRON_RENDERER_URL) return null
 
-autoUpdater.on('checking-for-update', () => {
-  _sender?.send('updater:status', { event: 'checking' })
-})
+  const { autoUpdater } = await import('electron-updater')
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
 
-autoUpdater.on('update-available', (info) => {
-  _sender?.send('updater:status', { event: 'available', version: info.version, releaseNotes: info.releaseNotes })
-})
+  autoUpdater.on('checking-for-update', () => {
+    _sender?.send('updater:status', { event: 'checking' })
+  })
 
-autoUpdater.on('update-not-available', () => {
-  _sender?.send('updater:status', { event: 'not-available' })
-})
+  autoUpdater.on('update-available', (info) => {
+    _sender?.send('updater:status', { event: 'available', version: info.version, releaseNotes: info.releaseNotes })
+  })
 
-autoUpdater.on('download-progress', (progress) => {
-  _sender?.send('updater:status', { event: 'progress', percent: Math.round(progress.percent) })
-})
+  autoUpdater.on('update-not-available', () => {
+    _sender?.send('updater:status', { event: 'not-available' })
+  })
 
-autoUpdater.on('update-downloaded', (info) => {
-  _sender?.send('updater:status', { event: 'downloaded', version: info.version })
-})
+  autoUpdater.on('download-progress', (progress) => {
+    _sender?.send('updater:status', { event: 'progress', percent: Math.round(progress.percent) })
+  })
 
-autoUpdater.on('error', (err) => {
-  _sender?.send('updater:status', { event: 'error', message: err.message })
-})
+  autoUpdater.on('update-downloaded', (info) => {
+    _sender?.send('updater:status', { event: 'downloaded', version: info.version })
+  })
+
+  autoUpdater.on('error', (err) => {
+    _sender?.send('updater:status', { event: 'error', message: err.message })
+  })
+
+  _autoUpdater = autoUpdater
+  return _autoUpdater
+}
 
 export function initUpdater(mainWindow) {
   _sender = mainWindow.webContents
 
-  ipcMain.handle('updater:check', async () => {
-    try {
-      await autoUpdater.checkForUpdates()
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err.message }
-    }
-  })
+  if (!_registered) {
+    ipcMain.handle('updater:check', async () => {
+      try {
+        const autoUpdater = await getAutoUpdater()
+        if (!autoUpdater) return { ok: false, error: 'Updater disabled in development' }
+        await autoUpdater.checkForUpdates()
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err.message }
+      }
+    })
 
-  ipcMain.handle('updater:download', async () => {
-    try {
-      await autoUpdater.downloadUpdate()
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err.message }
-    }
-  })
+    ipcMain.handle('updater:download', async () => {
+      try {
+        const autoUpdater = await getAutoUpdater()
+        if (!autoUpdater) return { ok: false, error: 'Updater disabled in development' }
+        await autoUpdater.downloadUpdate()
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err.message }
+      }
+    })
 
-  ipcMain.handle('updater:install', () => {
-    autoUpdater.quitAndInstall(false, true)
-  })
+    ipcMain.handle('updater:install', async () => {
+      const autoUpdater = await getAutoUpdater()
+      autoUpdater?.quitAndInstall(false, true)
+    })
 
-  // Check for updates 10 seconds after startup (only in production)
+    _registered = true
+  }
+
   if (!process.env.ELECTRON_RENDERER_URL) {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => {})
+    setTimeout(async () => {
+      const autoUpdater = await getAutoUpdater()
+      autoUpdater?.checkForUpdates().catch(() => {})
     }, 10_000)
   }
 }

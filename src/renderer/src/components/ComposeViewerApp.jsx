@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
-import Image from '@tiptap/extension-image'
-import {
-  IconClose, IconAttach, IconSend,
-  IconBold, IconItalic, IconUnderlineF, IconStrike,
-  IconListBullet, IconListOrdered,
-  IconAlignLeft, IconAlignCenter, IconAlignRight,
-  IconQuote
-} from './Icons'
 import { locales } from '../i18n/index'
+import RichTextEditor from './RichTextEditor'
+import {
+  IconClose, IconAttach, IconSend
+} from './Icons'
 
 function buildReplyBody(mode, msg, body) {
   if (!msg) return ''
@@ -124,7 +114,9 @@ export default function ComposeViewerApp({ composeData }) {
   const [attachments, setAttachments] = useState([])
   const [draftId, setDraftId] = useState(null)
   const [bodyVersion, setBodyVersion] = useState(0)
+  const [contextMenu, setContextMenu] = useState(null)
   const draftTimer = useRef(null)
+  const editorRef = useRef(null)
 
   useEffect(() => {
     window.api.settings.get().then(r => {
@@ -142,51 +134,36 @@ export default function ComposeViewerApp({ composeData }) {
     })
   }, [])
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Write your message…' }),
-      Image.configure({ inline: true, allowBase64: true }),
-    ],
-    onUpdate: () => setBodyVersion(v => v + 1),
-    editorProps: {
-      handlePaste(view, event) {
-        const items = event.clipboardData?.items || []
-        for (const item of items) {
-          if (item.type.startsWith('image/')) {
-            event.preventDefault()
-            const file = item.getAsFile()
-            if (!file) return false
-            const reader = new FileReader()
-            reader.onload = e => {
-              view.dispatch(
-                view.state.tr.replaceSelectionWith(
-                  view.state.schema.nodes.image.create({ src: e.target.result })
-                )
-              )
-            }
-            reader.readAsDataURL(file)
-            return true
-          }
-        }
-        return false
-      }
+  const [editorContent, setEditorContent] = useState('')
+
+  // Quill configuration completa come Outlook
+  const quillModules = {
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        [{ 'align': [] }],
+        ['blockquote', 'code-block'],
+        ['link', 'image', 'video'],
+        ['clean']
+      ]
     },
-    content: ''
-  })
+    clipboard: {
+      matchVisual: false
+    }
+  }
 
   useEffect(() => {
-    if (!editor) return
     const replyBody = buildReplyBody(mode, msg, body || msg?.body)
     const sig = settings.signature
       ? `<p></p><p>--</p><p>${settings.signature}</p>`
       : '<p></p>'
-    editor.commands.setContent(sig + (mode !== 'new' ? replyBody : ''))
-    editor.commands.focus('start')
-  }, [editor, mode])
+    setEditorContent(sig + (mode !== 'new' ? replyBody : ''))
+  }, [mode, msg, body, settings.signature])
 
   async function handleAttachFiles() {
     const result = await window.api.dialog.pickFiles()
@@ -203,7 +180,7 @@ export default function ComposeViewerApp({ composeData }) {
     if (!accountEmail) return
     clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(async () => {
-      const html = editor?.getHTML() || ''
+      const html = editorContent || ''
       if (!to && !subject && html === '<p></p>') return
       const draft = {
         id: draftId || undefined,
@@ -229,8 +206,8 @@ export default function ComposeViewerApp({ composeData }) {
     setSending(true)
     setError(null)
 
-    const html = editor?.getHTML() || ''
-    const text = editor?.getText() || ''
+    const html = editorRef.current?.getHTML() || editorContent || ''
+    const text = editorContent.replace(/<[^>]*>/g, '') || ''
 
     const creds = await window.api.auth.getCredentials()
     if (!creds.ok || !creds.creds) {
@@ -263,7 +240,7 @@ export default function ComposeViewerApp({ composeData }) {
 
   async function handleSaveDraft() {
     if (!accountEmail) return
-    const html = editor?.getHTML() || ''
+    const html = editorRef.current?.getHTML() || editorContent || ''
     const draft = {
       id: draftId || undefined,
       account_email: accountEmail,
@@ -280,8 +257,47 @@ export default function ComposeViewerApp({ composeData }) {
     window.close()
   }
 
+  function handleContextMenu(e) {
+    e.preventDefault()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      selectedText: editorRef.current?.getSelectedText()?.trim() || ''
+    })
+  }
+
+  async function handleEditorContextAction(action) {
+    try {
+      switch (action) {
+        case 'copy':
+          await editorRef.current?.copySelection()
+          break
+        case 'cut':
+          await editorRef.current?.cutSelection()
+          break
+        case 'paste':
+          await editorRef.current?.pasteText()
+          break
+        case 'selectAll':
+          editorRef.current?.selectAll()
+          break
+        case 'clearFormatting':
+          editorRef.current?.clearSelectionFormatting()
+          break
+        case 'attach':
+          await handleAttachFiles()
+          break
+      }
+    } catch (err) {
+      console.warn('Compose context action failed:', err)
+    }
+    setContextMenu(null)
+  }
+
   const locale = locales[settings.language] || locales['en-US']
   const t = (key) => (locale || locales['en-US'])[key] ?? key
+
+  const placeholderText = t('compose.placeholder')
 
   const windowTitle = (() => {
     if (mode === 'new') return t('compose.title.new')
@@ -290,22 +306,10 @@ export default function ComposeViewerApp({ composeData }) {
     return `${prefix} ${msg?.subject || ''}${suffix}`
   })()
 
-  const ToolBtn = ({ onClick, active, title, children }) => (
-    <button
-      className={`compose-tool-btn${active ? ' active' : ''}`}
-      onMouseDown={e => { e.preventDefault(); onClick() }}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-    >
-      {children}
-    </button>
-  )
-
   const theme = settings.theme || 'light'
 
   return (
-    <div className={`app-root theme-${theme} viewer-window`}>
+    <div className={`app-root theme-${theme} viewer-window`} onClick={() => setContextMenu(null)}>
       {/* Drag region for the native titlebar overlay area */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 150, height: 32, WebkitAppRegion: 'drag', zIndex: 9999 }} />
       <div className="compose-window compose-window--standalone">
@@ -318,7 +322,7 @@ export default function ComposeViewerApp({ composeData }) {
             label={t('compose.to')}
             value={to}
             onChange={setTo}
-            placeholder="recipient@example.com"
+            placeholder={t('compose.recipientPlaceholder')}
             contacts={contacts}
             trailing={
               <button className="compose-field__cc-toggle" onClick={() => setShowCcBcc(v => !v)} title={t('compose.ccBcc')}>
@@ -328,8 +332,8 @@ export default function ComposeViewerApp({ composeData }) {
           />
           {showCcBcc && (
             <>
-              <RecipientField label={t('compose.cc')} value={cc} onChange={setCc} placeholder="cc@example.com" contacts={contacts} />
-              <RecipientField label={t('compose.bcc')} value={bcc} onChange={setBcc} placeholder="bcc@example.com" contacts={contacts} />
+              <RecipientField label={t('compose.cc')} value={cc} onChange={setCc} placeholder={t('compose.ccPlaceholder')} contacts={contacts} />
+              <RecipientField label={t('compose.bcc')} value={bcc} onChange={setBcc} placeholder={t('compose.bccPlaceholder')} contacts={contacts} />
             </>
           )}
           <div className="compose-field">
@@ -344,37 +348,30 @@ export default function ComposeViewerApp({ composeData }) {
         </div>
 
         <div className="compose-toolbar">
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={editor?.isActive('bold')} title={t('compose.bold')}><IconBold size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={editor?.isActive('italic')} title={t('compose.italic')}><IconItalic size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleUnderline().run()}
-            active={editor?.isActive('underline')} title={t('compose.underline')}><IconUnderlineF size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleStrike().run()}
-            active={editor?.isActive('strike')} title={t('compose.strike')}><IconStrike size={15} /></ToolBtn>
-          <div className="compose-toolbar__separator" />
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={editor?.isActive('bulletList')} title={t('compose.bulletList')}><IconListBullet size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-            active={editor?.isActive('orderedList')} title={t('compose.orderedList')}><IconListOrdered size={15} /></ToolBtn>
-          <div className="compose-toolbar__separator" />
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('left').run()}
-            active={editor?.isActive({ textAlign: 'left' })} title={t('compose.alignLeft')}><IconAlignLeft size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('center').run()}
-            active={editor?.isActive({ textAlign: 'center' })} title={t('compose.alignCenter')}><IconAlignCenter size={15} /></ToolBtn>
-          <ToolBtn onClick={() => editor?.chain().focus().setTextAlign('right').run()}
-            active={editor?.isActive({ textAlign: 'right' })} title={t('compose.alignRight')}><IconAlignRight size={15} /></ToolBtn>
-          <div className="compose-toolbar__separator" />
-          <ToolBtn onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            active={editor?.isActive('blockquote')} title={t('compose.quote')}><IconQuote size={15} /></ToolBtn>
-          <div className="compose-toolbar__separator" />
-          <ToolBtn onClick={handleAttachFiles} active={false} title={t('compose.attach')}><IconAttach size={15} /></ToolBtn>
+          <button
+            className="compose-tool-btn"
+            onMouseDown={e => e.preventDefault()}
+            onClick={handleAttachFiles}
+            title={t('compose.attach')}
+            aria-label={t('compose.attach')}
+          >
+            <IconAttach size={15} />
+          </button>
           <div className="compose-toolbar__spacer" />
         </div>
 
         <div className="compose-window__editor">
-          <div className="tiptap-editor">
-            {editor && <EditorContent editor={editor} />}
+          <div className="compose-editor" onContextMenu={handleContextMenu}>
+            <RichTextEditor
+              ref={editorRef}
+              value={editorContent}
+              onChange={(html) => {
+                setEditorContent(html)
+                setBodyVersion(v => v + 1)
+              }}
+              modules={quillModules}
+              placeholder={placeholderText}
+            />
           </div>
         </div>
 
@@ -412,6 +409,44 @@ export default function ComposeViewerApp({ composeData }) {
           </div>
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          className="email-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('copy')}>
+              {t('action.copy')}
+            </button>
+          )}
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('cut')}>
+              {t('action.cut')}
+            </button>
+          )}
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('paste')}>
+            {t('action.paste')}
+          </button>
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('selectAll')}>
+            {t('action.selectAll')}
+          </button>
+          {contextMenu.selectedText && (
+            <button className="email-context-menu__item" onClick={() => handleEditorContextAction('clearFormatting')}>
+              {t('action.clearFormatting')}
+            </button>
+          )}
+          <button className="email-context-menu__item" onClick={() => handleEditorContextAction('attach')}>
+            {t('compose.attach')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -124,6 +124,12 @@ export async function initDB() {
     console.error('DB migration v3 error (non-fatal):', err.message)
   }
 
+  try {
+    _migrate4(db)
+  } catch (err) {
+    console.error('DB migration v4 error (non-fatal):', err.message)
+  }
+
   persistDB()
   return db
 }
@@ -356,7 +362,66 @@ function _migrate3(d) {
   d.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('schemaVersion', '3')`)
 }
 
-function getDB() {
+function _migrate4(d) {
+  let ver = 0
+  try {
+    const s = d.prepare(`SELECT value FROM settings WHERE key = 'schemaVersion'`)
+    if (s.step()) ver = parseInt(JSON.parse(s.getAsObject().value), 10) || 0
+    s.free()
+  } catch { /* ignore */ }
+  if (ver >= 4) return
+
+  // Add sync_status column to tables for offline-first sync
+  try { d.run(`ALTER TABLE messages ADD COLUMN sync_status TEXT DEFAULT 'synced'`) } catch { /* already exists */ }
+  try { d.run(`ALTER TABLE contacts ADD COLUMN sync_status TEXT DEFAULT 'synced'`) } catch { /* already exists */ }
+  try { d.run(`ALTER TABLE calendar_events ADD COLUMN sync_status TEXT DEFAULT 'synced'`) } catch { /* already exists */ }
+  try { d.run(`ALTER TABLE drafts ADD COLUMN sync_status TEXT DEFAULT 'pending'`) } catch { /* already exists */ }
+
+  // Create sync queue table for persistent operation queue
+  d.run(`
+    CREATE TABLE IF NOT EXISTS sync_queue (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation    TEXT NOT NULL,
+      target_type  TEXT NOT NULL,
+      target_id    TEXT,
+      data         TEXT NOT NULL,
+      account_email TEXT,
+      folder       TEXT,
+      uid          INTEGER,
+      created_at   INTEGER DEFAULT (strftime('%s','now') * 1000),
+      retry_count  INTEGER DEFAULT 0,
+      last_error   TEXT
+    )
+  `)
+
+  // Create outbox table for sending emails optimistically
+  d.run(`
+    CREATE TABLE IF NOT EXISTS outbox (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_email TEXT NOT NULL,
+      to_field      TEXT NOT NULL,
+      cc_field      TEXT,
+      bcc_field     TEXT,
+      subject       TEXT NOT NULL,
+      body_html     TEXT,
+      body_text     TEXT,
+      attachments   TEXT DEFAULT '[]',
+      in_reply_to   TEXT,
+      message_refs  TEXT,
+      sync_status   TEXT DEFAULT 'pending',
+      created_at    INTEGER DEFAULT (strftime('%s','now') * 1000),
+      sent_at       INTEGER,
+      error_message TEXT
+    )
+  `)
+
+  d.run(`CREATE INDEX IF NOT EXISTS idx_sync_queue_created ON sync_queue(created_at ASC)`)
+  d.run(`CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(sync_status)`)
+
+  d.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('schemaVersion', '4')`)
+}
+
+export function getDB() {
   if (!db) throw new Error('DB not initialized — call initDB() first')
   return db
 }
@@ -836,9 +901,11 @@ function _hydrateContact(r) {
 
 export function getContacts(accountEmail) {
   const d = getDB()
+  // Only include contacts with valid email addresses
+  const emailFilter = `email IS NOT NULL AND email != '' AND email LIKE '%@%.%' AND email NOT LIKE '%@%@%' AND LENGTH(TRIM(email)) = LENGTH(email)`
   const stmt = accountEmail
-    ? d.prepare(`SELECT * FROM contacts WHERE account_email = ? OR account_email IS NULL ORDER BY display_name ASC`)
-    : d.prepare(`SELECT * FROM contacts ORDER BY display_name ASC`)
+    ? d.prepare(`SELECT * FROM contacts WHERE (account_email = ? OR account_email IS NULL) AND ${emailFilter} ORDER BY display_name ASC`)
+    : d.prepare(`SELECT * FROM contacts WHERE ${emailFilter} ORDER BY display_name ASC`)
   if (accountEmail) stmt.bind([accountEmail])
   const rows = allRows(stmt)
   return rows.map(r => _hydrateContact(r))
@@ -847,9 +914,12 @@ export function getContacts(accountEmail) {
 export function searchContacts(query, accountEmail) {
   const d = getDB()
   const q = `%${query}%`
+  // Only include contacts with valid email addresses
+  const emailFilter = `email IS NOT NULL AND email != '' AND email LIKE '%@%.%' AND email NOT LIKE '%@%@%' AND LENGTH(TRIM(email)) = LENGTH(email)`
   const stmt = d.prepare(`
     SELECT * FROM contacts
     WHERE (display_name LIKE ? OR email LIKE ? OR organization LIKE ?)
+      AND ${emailFilter}
       ${accountEmail ? 'AND (account_email = ? OR account_email IS NULL)' : ''}
     ORDER BY display_name ASC
     LIMIT 20

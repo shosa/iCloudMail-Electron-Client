@@ -20,17 +20,11 @@
     "vite": "^5.1.4"
   },
   "dependencies": {
-    "@tiptap/extension-image": "^2.27.2",
-    "@tiptap/extension-link": "^2.2.4",
-    "@tiptap/extension-placeholder": "^2.2.4",
-    "@tiptap/extension-text-align": "^2.2.4",
-    "@tiptap/extension-underline": "^2.2.4",
-    "@tiptap/react": "^2.2.4",
-    "@tiptap/starter-kit": "^2.2.4",
     "electron-updater": "^6.8.3",
     "imapflow": "^1.0.162",
     "mailparser": "^3.9.8",
     "nodemailer": "^6.9.12",
+    "quill": "^2.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sql.js": "^1.12.0"

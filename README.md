@@ -199,6 +199,6 @@ Do **not** include your email address, your app-specific password, or any privat
 
 <div align="center">
 
-Built with [Electron](https://electronjs.org) · [React](https://reactjs.org) · [imapflow](https://imapflow.com) · [Tiptap](https://tiptap.dev) · [sql.js](https://sql.js.org) · [nodemailer](https://nodemailer.com)
+Built with [Electron](https://electronjs.org) · [React](https://reactjs.org) · [imapflow](https://imapflow.com) · [Quill](https://quilljs.com) · [sql.js](https://sql.js.org) · [nodemailer](https://nodemailer.com)
 
 </div>

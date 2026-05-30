@@ -1,12 +1,15 @@
 import React from 'react'
+import { useTranslation } from '../i18n/index'
 
 export default function TitleBar({ connectionStatus }) {
+  const t = useTranslation()
+
   const statusLabel = {
-    connected: 'Online',
-    connecting: 'Connecting…',
-    reconnecting: 'Reconnecting…',
+    connected: t('status.connected'),
+    connecting: t('status.connecting'),
+    reconnecting: t('status.reconnecting'),
     disconnected: '',
-    error: 'Error'
+    error: t('status.error')
   }[connectionStatus] || ''
 
   const dotClass = {

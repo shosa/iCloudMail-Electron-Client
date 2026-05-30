@@ -59,7 +59,9 @@ contextBridge.exposeInMainWorld('api', {
   // ── SMTP ────────────────────────────────────────────────────────────────────
   smtp: {
     send: (email, password, mailOptions) =>
-      ipcRenderer.invoke('smtp:send', email, password, mailOptions)
+      ipcRenderer.invoke('smtp:send', email, password, mailOptions),
+    sendOptimistic: (outboxEmail) =>
+      ipcRenderer.invoke('smtp:send-optimistic', outboxEmail)
   },
 
   // ── Local store ─────────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Push events (main → renderer) ───────────────────────────────────────────
   on: (channel, callback) => {
-    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'imap:flags-updated', 'open-compose', 'imap:notification-click', 'updater:status']
+    const allowed = ['imap:new-mail', 'imap:connection-status', 'imap:sync-complete', 'imap:flags-updated', 'open-compose', 'imap:notification-click', 'updater:status', 'sync:operation-start', 'sync:operation-end']
     if (!allowed.includes(channel)) return
     const sub = (_event, ...args) => callback(...args)
     ipcRenderer.on(channel, sub)
